@@ -20,6 +20,7 @@ dependencies:
   - kerchunk
   - tifffile
   - duckdb
+  - toolz
 
   # extras for zarr-eosdis-store
   - cachecontrol
@@ -53,6 +54,7 @@ dependencies:
   - pytest
   - pytest-cov
   - pytest-timeout
+  - pystac
 
   - pip:
       - ../odc-geo
