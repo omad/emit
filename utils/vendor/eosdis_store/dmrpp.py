@@ -103,7 +103,7 @@ def get_dimensions(root, group=None):
             ".//d:*[@name='%s']/d:Dim[@name='%s']/.." % (basename, name), NS
         )
         if dim_node is None:
-            logger.warning(f"Could not find details for dimension {name}")
+            # logger.warning(f"Could not find details for dimension {name}")
             continue
         node = dim_node.find(f"./d:Attribute[@name='fullnamepath']/d:Value", NS)
         if node:
@@ -198,7 +198,7 @@ def array_to_zarr(node, dims, prefix=""):
                     "id": "zlib",
                     "level": UNKNOWN_COMPRESSION_LEVEL,
                 }
-            elif compression == "deflate shuffle":
+            elif compression in ("deflate shuffle", "shuffle deflate"):
                 zarray["compressor"] = {
                     "id": "zlib",
                     "level": UNKNOWN_COMPRESSION_LEVEL,
