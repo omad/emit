@@ -29,21 +29,22 @@ class ElapsedFuturesSession(FuturesSession):
             r.elapsed = time.time() - start
 
         try:
-            if isinstance(hooks['response'], (list, tuple)):
+            if isinstance(hooks["response"], (list, tuple)):
                 # needs to be first so we don't time other hooks execution
-                hooks['response'].insert(0, timing)
+                hooks["response"].insert(0, timing)
             else:
-                hooks['response'] = [timing, hooks['response']]
+                hooks["response"] = [timing, hooks["response"]]
         except KeyError:
-            hooks['response'] = timing
+            hooks["response"] = timing
 
-        return super(ElapsedFuturesSession, self) \
-            .request(method, url, hooks=hooks, *args, **kwargs)
+        return super(ElapsedFuturesSession, self).request(
+            method, url, hooks=hooks, *args, **kwargs
+        )
 
 
-class HttpByteRangeReader():
-    """Perform HTTP range reads on remote files
-    """
+class HttpByteRangeReader:
+    """Perform HTTP range reads on remote files"""
+
     def __init__(self, url):
         """Create HttpByteRangeRead instance for a single file
 
@@ -57,11 +58,10 @@ class HttpByteRangeReader():
         self.session = ElapsedFuturesSession()
         cache_adapter = CacheControlAdapter()
         cache_adapter.controller = CacheController(
-            cache=cache_adapter.cache,
-            status_codes=(200, 203, 300, 301, 303, 307)
+            cache=cache_adapter.cache, status_codes=(200, 203, 300, 301, 303, 307)
         )
-        self.session.mount('http://', cache_adapter)
-        self.session.mount('https://', cache_adapter)
+        self.session.mount("http://", cache_adapter)
+        self.session.mount("https://", cache_adapter)
 
     def read_range(self, offset, size):
         """Read a range of bytes from remote file
@@ -99,11 +99,14 @@ class HttpByteRangeReader():
             response: Return request response
         """
         logger.debug(f"Reading {self.url} [{offset}:{offset+size}] ({size} bytes)")
-        range_str = '%d-%d' % (offset, offset + size)
-        request = self.session.get(self.url, headers={
-            'Range': 'bytes=' + range_str,
-            'User-Agent': f'zarr-eosdis-store/{__version__}'
-        })
+        range_str = "%d-%d" % (offset, offset + size)
+        request = self.session.get(
+            self.url,
+            headers={
+                "Range": "bytes=" + range_str,
+                "User-Agent": f"zarr-eosdis-store/{__version__}",
+            },
+        )
         if self.first_fetch:
             self.first_fetch = False
             request.result()
@@ -117,6 +120,7 @@ class ConsolidatedChunkStore(ConsolidatedMetadataStore):
     Args:
         ConsolidatedMetadataStore (ConsolidatedMetadataStore): Parent class using single source of metadata
     """
+
     def __init__(self, meta_store, data_url):
         """Instantiate ConsolidatedChunkStore
 
@@ -136,7 +140,7 @@ class ConsolidatedChunkStore(ConsolidatedMetadataStore):
         Returns:
             The data or metadata value of the item
         """
-        return self.getitems((key, ))[key]
+        return self.getitems((key,))[key]
 
     def getitems(self, keys, **kwargs):
         """Get values for the provided list of keys from the Zarr store
@@ -150,15 +154,14 @@ class ConsolidatedChunkStore(ConsolidatedMetadataStore):
         return dict(self._getitems_generator(keys, **kwargs))
 
     def _getitems_generator(self, keys, **kwargs):
-        """Generate results for getitems
-        """
+        """Generate results for getitems"""
         ranges = []
         for key in keys:
-            if re.search(r'/\d+(\.\d+)*$', key):
+            if re.search(r"/\d+(\.\d+)*$", key):
                 # The key corresponds to a chunk within the file, look up its offset and size
-                path, name = key.rsplit('/', 1)
-                chunk_loc = self.meta_store[path + '/.zchunkstore'][name]
-                ranges.append((key, chunk_loc['offset'], chunk_loc['size']))
+                path, name = key.rsplit("/", 1)
+                chunk_loc = self.meta_store[path + "/.zchunkstore"][name]
+                ranges.append((key, chunk_loc["offset"], chunk_loc["size"]))
             else:
                 # Metadata key, return its value
                 yield (key, super().__getitem__(key))
@@ -168,42 +171,44 @@ class ConsolidatedChunkStore(ConsolidatedMetadataStore):
             yield (k, v)
 
     def _getranges(self, ranges):
-        '''Given a set of byte ranges [(key, offset, size), ...], fetches and returns a mapping of keys to bytes
+        """Given a set of byte ranges [(key, offset, size), ...], fetches and returns a mapping of keys to bytes
 
         Args:
             ranges (Array): Array of desired byte ranges of the form [(key, offset, size), ...]
         Returns:
             dict-like [(key, bytes), (key, bytes), ...]
-        '''
+        """
         reader = self.chunk_source
         ranges = sorted(ranges, key=lambda r: r[1])
         merged_ranges = self._merge_ranges(ranges)
         range_data_offsets = [r[-1] for r in merged_ranges]
         logger.debug(f"Merged {len(ranges)} requests into {len(range_data_offsets)}")
 
-        range_data = reader.read_ranges([(offset, size) for offset, size, _ in merged_ranges])
+        range_data = reader.read_ranges(
+            [(offset, size) for offset, size, _ in merged_ranges]
+        )
         self.responses = list(range_data)
         range_data = [r.content for r in self.responses]
         result = self._split_ranges(zip(range_data_offsets, range_data))
         return result
 
     def _split_ranges(self, merged_ranges):
-        '''Given tuples of range groups as returned by _merge_ranges and corresponding bytes,
+        """Given tuples of range groups as returned by _merge_ranges and corresponding bytes,
         returns a map of keys to corresponding bytes.
 
         Args:
             merged_ranges (Array): Array of (group, bytes) where group is as returned by _merge_ranges
         Returns:
             dict-like [(key, bytes), (key, bytes), ...]
-        '''
+        """
         result = {}
         for ranges, data in merged_ranges:
             for key, offset, size in ranges:
-                result[key] = data[offset:(offset+size)]
+                result[key] = data[offset : (offset + size)]
         return result
 
     def _merge_ranges(self, ranges, max_gap=10000):
-        '''Group an array of byte ranges that need to be read such that any that are within `max_gap`
+        """Group an array of byte ranges that need to be read such that any that are within `max_gap`
         of each other are in the same group.
 
         Args:
@@ -226,7 +231,7 @@ class ConsolidatedChunkStore(ConsolidatedMetadataStore):
                     ],
                     ...
                 ]
-        '''
+        """
         ranges = sorted(ranges, key=lambda r: r[1])
         if len(ranges) == 0:
             return []
@@ -236,7 +241,10 @@ class ConsolidatedChunkStore(ConsolidatedMetadataStore):
         result = []
         for key, offset, size in ranges:
             if offset - prev_offset > max_gap + 1:
-                logger.debug("Starting new range due to gap of %d bytes" % (offset - prev_offset,))
+                logger.debug(
+                    "Starting new range due to gap of %d bytes"
+                    % (offset - prev_offset,)
+                )
                 result.append((group_offset, prev_offset - group_offset, group))
                 group_offset = offset
                 group = []
@@ -252,6 +260,7 @@ class EosdisStore(ConsolidatedChunkStore):
     Args:
         ConsolidatedChunkStore (ConsolidatedChunkStore): Parent class is a store for doing byte range reads
     """
+
     def __init__(self, data_url, dmr_url=None):
         """Construct the store
 
@@ -261,7 +270,7 @@ class EosdisStore(ConsolidatedChunkStore):
             given file.  If not provided, the URL is assumed to be the original file with a .dmrpp suffix
         """
         if dmr_url is None:
-            dmr_url = data_url + '.dmrpp'
+            dmr_url = data_url + ".dmrpp"
         dmrpp = requests.get(dmr_url).text
         tree = ElementTree.fromstring(dmrpp)
         meta_store = to_zarr(tree)
