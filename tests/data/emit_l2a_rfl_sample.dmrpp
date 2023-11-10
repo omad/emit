@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="EMIT_L2A_RFL_001_20230316T045133_2307503_005.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.20.13-184">
+    <Dimension name="downtrack" size="2176"/>
+    <Dimension name="crosstrack" size="1242"/>
+    <Dimension name="bands" size="285"/>
+    <Dimension name="ortho_y" size="2547"/>
+    <Dimension name="ortho_x" size="3325"/>
+    <Float32 name="reflectance">
+        <Dim name="/downtrack"/>
+        <Dim name="/crosstrack"/>
+        <Dim name="/bands"/>
+        <Attribute name="_FillValue" type="Float32">
+            <Value>-9999.</Value>
+        </Attribute>
+        <Attribute name="long_name" type="String">
+            <Value>Surface Reflectance</Value>
+        </Attribute>
+        <Attribute name="units" type="String">
+            <Value>unitless</Value>
+        </Attribute>
+        <dmrpp:chunks fillValue="-9999" byteOrder="LE">
+            <dmrpp:chunk offset="65873247" nBytes="3080954880"/>
+        </dmrpp:chunks>
+    </Float32>
+    <Attribute name="ncei_template_version" type="String">
+        <Value>NCEI_NetCDF_Swath_Template_v2.0</Value>
+    </Attribute>
+    <Attribute name="summary" type="String">
+        <Value>The Earth Surface Mineral Dust Source Investigation (EMIT) is an Earth Ventures-Instrument (EVI-4) Mission that maps the surface mineralogy of arid dust source regions via imaging spectroscopy in the visible and short-wave infrared (VSWIR). Installed on the International Space Station (ISS), the EMIT instrument is a Dyson imaging spectrometer that uses contiguous spectroscopic measurements from 410 to 2450 nm to resolve absoprtion features of iron oxides, clays, sulfates, carbonates, and other dust-forming minerals. During its one-year mission, EMIT will observe the sunlit Earth's dust source regions that occur within +/-52\302\260 latitude and produce maps of the source regions that can be used to improve forecasts of the role of mineral dust in the radiative forcing (warming or cooling) of the atmosphere.\n\nThis file contains L2A estimated surface reflectances and geolocation data. Reflectance estimates are created using an Optimal Estimation technique - see ATBD for details. Reflectance values are reported as fractions (relative to 1). Geolocation data (latitude, longitude, height) and a lookup table to project the data are also included.</Value>
+    </Attribute>
+    <Attribute name="keywords" type="String">
+        <Value>Imaging Spectroscopy, minerals, EMIT, dust, radiative forcing</Value>
+    </Attribute>
+    <Attribute name="Conventions" type="String">
+        <Value>CF-1.63</Value>
+    </Attribute>
+    <Attribute name="sensor" type="String">
+        <Value>EMIT (Earth Surface Mineral Dust Source Investigation)</Value>
+    </Attribute>
+    <Attribute name="instrument" type="String">
+        <Value>EMIT</Value>
+    </Attribute>
+    <Attribute name="platform" type="String">
+        <Value>ISS</Value>
+    </Attribute>
+    <Attribute name="institution" type="String">
+        <Value>NASA Jet Propulsion Laboratory/California Institute of Technology</Value>
+    </Attribute>
+    <Attribute name="license" type="String">
+        <Value>https://science.nasa.gov/earth-science/earth-science-data/data-information-policy/</Value>
+    </Attribute>
+    <Attribute name="naming_authority" type="String">
+        <Value>LPDAAC</Value>
+    </Attribute>
+    <Attribute name="date_created" type="String">
+        <Value>2023-03-17T10:29:08Z</Value>
+    </Attribute>
+    <Attribute name="keywords_vocabulary" type="String">
+        <Value>NASA Global Change Master Directory (GCMD) Science Keywords</Value>
+    </Attribute>
+    <Attribute name="stdname_vocabulary" type="String">
+        <Value>NetCDF Climate and Forecast (CF) Metadata Convention</Value>
+    </Attribute>
+    <Attribute name="creator_name" type="String">
+        <Value>Jet Propulsion Laboratory/California Institute of Technology</Value>
+    </Attribute>
+    <Attribute name="creator_url" type="String">
+        <Value>https://earth.jpl.nasa.gov/emit/</Value>
+    </Attribute>
+    <Attribute name="project" type="String">
+        <Value>Earth Surface Mineral Dust Source Investigation</Value>
+    </Attribute>
+    <Attribute name="project_url" type="String">
+        <Value>https://emit.jpl.nasa.gov/</Value>
+    </Attribute>
+    <Attribute name="publisher_name" type="String">
+        <Value>NASA LPDAAC</Value>
+    </Attribute>
+    <Attribute name="publisher_url" type="String">
+        <Value>https://lpdaac.usgs.gov</Value>
+    </Attribute>
+    <Attribute name="publisher_email" type="String">
+        <Value>lpdaac@usgs.gov</Value>
+    </Attribute>
+    <Attribute name="identifier_product_doi_authority" type="String">
+        <Value>https://doi.org</Value>
+    </Attribute>
+    <Attribute name="flight_line" type="String">
+        <Value>emit20230316t045133_o07503_s002</Value>
+    </Attribute>
+    <Attribute name="time_coverage_start" type="String">
+        <Value>2023-03-16T04:51:33+0000</Value>
+    </Attribute>
+    <Attribute name="time_coverage_end" type="String">
+        <Value>2023-03-16T04:51:53+0000</Value>
+    </Attribute>
+    <Attribute name="software_build_version" type="String">
+        <Value>010610</Value>
+    </Attribute>
+    <Attribute name="software_delivery_version" type="String">
+        <Value>010610</Value>
+    </Attribute>
+    <Attribute name="product_version" type="String">
+        <Value>V001</Value>
+    </Attribute>
+    <Attribute name="history" type="String">
+        <Value>PGE Run Command: {python /beegfs/store/emit/ops/repos/emit-sds-l2a/spectrum_quality.py /tmp/emit/ops/emit20230316t045133_emit.L2AReflectance_20230317t075031/output/emit20230316t045133_rfl /tmp/emit/ops/emit20230316t045133_emit.L2AReflectance_20230317t075031/output/emit20230316t045133_rfl_quality.txt}, PGE Input Files: {radiance_file=/beegfs/store/emit/ops/data/acquisitions/20230316/emit20230316t045133/l1b/emit20230316t045133_o07503_s002_l1b_rdn_b0106_v01.img, pixel_locations_file=/beegfs/store/emit/ops/data/acquisitions/20230316/emit20230316t045133/l1b/emit20230316t045133_o07503_s002_l1b_loc_b0106_v01.img, observation_parameters_file=/beegfs/store/emit/ops/data/acquisitions/20230316/emit20230316t045133/l1b/emit20230316t045133_o07503_s002_l1b_obs_b0106_v01.img, surface_model_config=/beegfs/store/emit/ops/repos/emit-sds-l2a/surface/surface_20221020.json}</Value>
+    </Attribute>
+    <Attribute name="crosstrack_orientation" type="String">
+        <Value>as seen on ground</Value>
+    </Attribute>
+    <Attribute name="easternmost_longitude" type="Float64">
+        <Value>148.19404051362542</Value>
+    </Attribute>
+    <Attribute name="northernmost_latitude" type="Float64">
+        <Value>-35.642894008129403</Value>
+    </Attribute>
+    <Attribute name="westernmost_longitude" type="Float64">
+        <Value>146.39111738377301</Value>
+    </Attribute>
+    <Attribute name="southernmost_latitude" type="Float64">
+        <Value>-37.023960237222369</Value>
+    </Attribute>
+    <Attribute name="spatialResolution" type="Float64">
+        <Value>0.00054223252025636698</Value>
+    </Attribute>
+    <Attribute name="spatial_ref" type="String">
+        <Value>GEOGCS[&quot;WGS 84&quot;,DATUM[&quot;WGS_1984&quot;,SPHEROID[&quot;WGS 84&quot;,6378137,298.257223563,AUTHORITY[&quot;EPSG&quot;,&quot;7030&quot;]],AUTHORITY[&quot;EPSG&quot;,&quot;6326&quot;]],PRIMEM[&quot;Greenwich&quot;,0,AUTHORITY[&quot;EPSG&quot;,&quot;8901&quot;]],UNIT[&quot;degree&quot;,0.0174532925199433,AUTHORITY[&quot;EPSG&quot;,&quot;9122&quot;]],AXIS[&quot;Latitude&quot;,NORTH],AXIS[&quot;Longitude&quot;,EAST],AUTHORITY[&quot;EPSG&quot;,&quot;4326&quot;]]</Value>
+    </Attribute>
+    <Attribute name="geotransform" type="Float64">
+        <Value>146.39111738377301</Value>
+        <Value>0.00054223252025636698</Value>
+        <Value>-0.</Value>
+        <Value>-35.642894008129403</Value>
+        <Value>-0.</Value>
+        <Value>-0.00054223252025636698</Value>
+    </Attribute>
+    <Attribute name="day_night_flag" type="String">
+        <Value>Day</Value>
+    </Attribute>
+    <Attribute name="title" type="String">
+        <Value>EMIT L2A Estimated Surface Reflectance 60 m V001</Value>
+    </Attribute>
+    <Attribute name="build_dmrpp_metadata" type="Container">
+        <Attribute name="build_dmrpp" type="String">
+            <Value>3.20.13-184</Value>
+        </Attribute>
+        <Attribute name="bes" type="String">
+            <Value>3.20.13-184</Value>
+        </Attribute>
+        <Attribute name="libdap" type="String">
+            <Value>libdap-3.20.11-59</Value>
+        </Attribute>
+        <Attribute name="configuration" type="String">
+            <Value>
+# TheBESKeys::get_as_config()
+AllowedHosts=^https?:\/\/
+BES.Catalog.catalog.FollowSymLinks=Yes
+BES.Catalog.catalog.RootDirectory=/tmp/tmpo_p498mk/
+BES.Catalog.catalog.TypeMatch=dmrpp:.*\.(dmrpp)$;
+BES.Catalog.catalog.TypeMatch+=h5:.*(\.bz2|\.gz|\.Z)?$;
+BES.Data.RootDirectory=/dev/null
+BES.LogName=./bes.log
+BES.UncompressCache.dir=/tmp/hyrax_ux
+BES.UncompressCache.prefix=ux_
+BES.UncompressCache.size=500
+BES.module.cmd=/usr/lib64/bes/libdap_xml_module.so
+BES.module.dap=/usr/lib64/bes/libdap_module.so
+BES.module.dmrpp=/usr/lib64/bes/libdmrpp_module.so
+BES.module.fonc=/usr/lib64/bes/libfonc_module.so
+BES.module.h5=/usr/lib64/bes/libhdf5_module.so
+BES.module.nc=/usr/lib64/bes/libnc_module.so
+BES.modules=dap,cmd,h5,dmrpp,nc,fonc
+FONc.ClassicModel=false
+FONc.NoGlobalAttrs=true
+H5.EnableCF=false
+H5.EnableCheckNameClashing=true
+</Value>
+        </Attribute>
+        <Attribute name="invocation" type="String">
+            <Value>build_dmrpp -c /tmp/bes_conf_Zn4r -f /tmp/tmpo_p498mk//EMIT_L2A_RFL_001_20230316T045133_2307503_005.nc -r /tmp/dmr__dMBGLq -u OPeNDAP_DMRpp_DATA_ACCESS_URL -M</Value>
+        </Attribute>
+    </Attribute>
+    <Group name="sensor_band_parameters">
+        <Float32 name="wavelengths">
+            <Dim name="/bands"/>
+            <Attribute name="_FillValue" type="Float32">
+                <Value>-9999.</Value>
+            </Attribute>
+            <Attribute name="long_name" type="String">
+                <Value>Wavelength Centers</Value>
+            </Attribute>
+            <Attribute name="units" type="String">
+                <Value>nm</Value>
+            </Attribute>
+            <dmrpp:chunks fillValue="-9999" byteOrder="LE">
+                <dmrpp:chunk offset="16246" nBytes="1140"/>
+            </dmrpp:chunks>
+        </Float32>
+        <Float32 name="fwhm">
+            <Dim name="/bands"/>
+            <Attribute name="_FillValue" type="Float32">
+                <Value>-9999.</Value>
+            </Attribute>
+            <Attribute name="long_name" type="String">
+                <Value>Full Width at Half Max</Value>
+            </Attribute>
+            <Attribute name="units" type="String">
+                <Value>nm</Value>
+            </Attribute>
+            <dmrpp:chunks fillValue="-9999" byteOrder="LE">
+                <dmrpp:chunk offset="18058" nBytes="1140"/>
+            </dmrpp:chunks>
+        </Float32>
+        <Byte name="good_wavelengths">
+            <Dim name="/bands"/>
+            <Attribute name="_FillValue" type="Byte">
+                <Value>241</Value>
+            </Attribute>
+            <Attribute name="long_name" type="String">
+                <Value>Wavelengths where reflectance is useable: 1 = good data, 0 = bad data</Value>
+            </Attribute>
+            <Attribute name="units" type="String">
+                <Value>unitless</Value>
+            </Attribute>
+            <dmrpp:chunks fillValue="241" byteOrder="LE">
+                <dmrpp:chunk offset="19914" nBytes="285"/>
+            </dmrpp:chunks>
+        </Byte>
+    </Group>
+    <Group name="location">
+        <Float64 name="lon">
+            <Dim name="/downtrack"/>
+            <Dim name="/crosstrack"/>
+            <Attribute name="_FillValue" type="Float64">
+                <Value>-9999.</Value>
+            </Attribute>
+            <Attribute name="long_name" type="String">
+                <Value>Longitude (WGS-84)</Value>
+            </Attribute>
+            <Attribute name="units" type="String">
+                <Value>degrees east</Value>
+            </Attribute>
+            <dmrpp:chunks fillValue="-9999" byteOrder="LE">
+                <dmrpp:chunk offset="20991" nBytes="21620736"/>
+            </dmrpp:chunks>
+        </Float64>
+        <Float64 name="lat">
+            <Dim name="/downtrack"/>
+            <Dim name="/crosstrack"/>
+            <Attribute name="_FillValue" type="Float64">
+                <Value>-9999.</Value>
+            </Attribute>
+            <Attribute name="long_name" type="String">
+                <Value>Latitude (WGS-84)</Value>
+            </Attribute>
+            <Attribute name="units" type="String">
+                <Value>degrees north</Value>
+            </Attribute>
+            <dmrpp:chunks fillValue="-9999" byteOrder="LE">
+                <dmrpp:chunk offset="21642773" nBytes="21620736"/>
+            </dmrpp:chunks>
+        </Float64>
+        <Float64 name="elev">
+            <Dim name="/downtrack"/>
+            <Dim name="/crosstrack"/>
+            <Attribute name="_FillValue" type="Float64">
+                <Value>-9999.</Value>
+            </Attribute>
+            <Attribute name="long_name" type="String">
+                <Value>Surface Elevation</Value>
+            </Attribute>
+            <Attribute name="units" type="String">
+                <Value>m</Value>
+            </Attribute>
+            <dmrpp:chunks fillValue="-9999" byteOrder="LE">
+                <dmrpp:chunk offset="43264321" nBytes="21620736"/>
+            </dmrpp:chunks>
+        </Float64>
+        <Int32 name="glt_x">
+            <Dim name="/ortho_y"/>
+            <Dim name="/ortho_x"/>
+            <Attribute name="_FillValue" type="Int32">
+                <Value>-9999</Value>
+            </Attribute>
+            <Attribute name="long_name" type="String">
+                <Value>GLT Sample Lookup</Value>
+            </Attribute>
+            <Attribute name="units" type="String">
+                <Value>pixel location</Value>
+            </Attribute>
+            <dmrpp:chunks compressionType="shuffle deflate" fillValue="-9999" byteOrder="LE">
+                <dmrpp:chunkDimensionSizes>849 1109</dmrpp:chunkDimensionSizes>
+                <dmrpp:chunk offset="64888283" nBytes="5842" chunkPositionInArray="[0,0]"/>
+                <dmrpp:chunk offset="64894125" nBytes="66700" chunkPositionInArray="[0,1109]"/>
+                <dmrpp:chunk offset="65166969" nBytes="49306" chunkPositionInArray="[0,2218]"/>
+                <dmrpp:chunk offset="64960825" nBytes="71306" chunkPositionInArray="[849,0]"/>
+                <dmrpp:chunk offset="65032131" nBytes="87196" chunkPositionInArray="[849,1109]"/>
+                <dmrpp:chunk offset="65216275" nBytes="64244" chunkPositionInArray="[849,2218]"/>
+                <dmrpp:chunk offset="65119327" nBytes="47642" chunkPositionInArray="[1698,0]"/>
+                <dmrpp:chunk offset="65280519" nBytes="60866" chunkPositionInArray="[1698,1109]"/>
+                <dmrpp:chunk offset="65341385" nBytes="9482" chunkPositionInArray="[1698,2218]"/>
+            </dmrpp:chunks>
+        </Int32>
+        <Int32 name="glt_y">
+            <Dim name="/ortho_y"/>
+            <Dim name="/ortho_x"/>
+            <Attribute name="_FillValue" type="Int32">
+                <Value>-9999</Value>
+            </Attribute>
+            <Attribute name="long_name" type="String">
+                <Value>GLT Line Lookup</Value>
+            </Attribute>
+            <Attribute name="units" type="String">
+                <Value>pixel location</Value>
+            </Attribute>
+            <dmrpp:chunks compressionType="shuffle deflate" fillValue="-9999" byteOrder="LE">
+                <dmrpp:chunkDimensionSizes>849 1109</dmrpp:chunkDimensionSizes>
+                <dmrpp:chunk offset="65354567" nBytes="6353" chunkPositionInArray="[0,0]"/>
+                <dmrpp:chunk offset="65360920" nBytes="69843" chunkPositionInArray="[0,1109]"/>
+                <dmrpp:chunk offset="65661210" nBytes="49392" chunkPositionInArray="[0,2218]"/>
+                <dmrpp:chunk offset="65430763" nBytes="75369" chunkPositionInArray="[849,0]"/>
+                <dmrpp:chunk offset="65506132" nBytes="102233" chunkPositionInArray="[849,1109]"/>
+                <dmrpp:chunk offset="65710602" nBytes="77073" chunkPositionInArray="[849,2218]"/>
+                <dmrpp:chunk offset="65608365" nBytes="52845" chunkPositionInArray="[1698,0]"/>
+                <dmrpp:chunk offset="65787675" nBytes="73767" chunkPositionInArray="[1698,1109]"/>
+                <dmrpp:chunk offset="65861442" nBytes="10674" chunkPositionInArray="[1698,2218]"/>
+            </dmrpp:chunks>
+        </Int32>
+    </Group>
+</Dataset>
