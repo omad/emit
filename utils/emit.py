@@ -3,12 +3,13 @@ EMIT helper functions.
 """
 
 import mmap
-import re
 import os
+import sys
 import xml.etree.ElementTree as ElementTree
 from collections import namedtuple
 import requests
 from cachetools import cached
+from pathlib import Path
 
 from odc.geo.math import affine_from_pts, quasi_random_r2
 from odc.geo import xy_, wh_
@@ -18,17 +19,17 @@ from odc.geo.xr import xr_coords
 from odc.geo import geom
 from affine import Affine
 
-import eosdis_store
 import numpy as np
 import xarray as xr
-from eosdis_store.dmrpp import get_dimensions, group_to_zarr, to_zarr
+from .vendor.eosdis_store.dmrpp import to_zarr
 from odc.geo import geom
 from odc.geo.gcp import GCPGeoBox
 
 from .txt import slurp
 
 ChunkInfo = namedtuple(
-    "ChunkInfo", ["shape", "dtype", "order", "fill_value", "byte_range", "compressor", "filters"]
+    "ChunkInfo",
+    ["shape", "dtype", "order", "fill_value", "byte_range", "compressor", "filters"],
 )
 
 BBOX_KEYS = (
@@ -122,7 +123,8 @@ def _parse_band_info(md_store, band=None):
     ii = md_store[f"{band}/.zarray"]
 
     shape, dtype, order, fill_value, compressor, filters = (
-        ii.get(k, None) for k in ("shape", "dtype", "order", "fill_value", "compressor", "filters")
+        ii.get(k, None)
+        for k in ("shape", "dtype", "order", "fill_value", "compressor", "filters")
     )
     shape = tuple(shape)
 

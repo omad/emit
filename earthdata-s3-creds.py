@@ -8,9 +8,9 @@ import json
 
 dst_file = "/tmp/earthdata-s3.env"
 dst_file_json = dst_file.replace(".env", ".json")
-tk_file = Path.home()/".safe"/"earth-data.tk"
+tk_file = Path.home() / ".safe" / "earth-data.tk"
 
-if (tk := os.environ.get('EARTHDATA_TOKEN', None)) is None:
+if (tk := os.environ.get("EARTHDATA_TOKEN", None)) is None:
     if tk_file.exists():
         print(f"Reading from: {tk_file}", file=sys.stderr)
         tk = open(tk_file, "rt", encoding="utf8").read().strip()
@@ -39,5 +39,5 @@ export AWS_DEFAULT_REGION=us-west-2
         ),
         file=f,
     )
-    
+
 print(f"Saved to: {dst_file} {dst_file_json}")

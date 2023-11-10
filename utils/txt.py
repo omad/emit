@@ -26,6 +26,7 @@ PathLike = Union[Path, str]
 
 T = TypeVar("T")
 
+
 def txt_lines(fname: PathLike) -> Iterator[str]:
     _open = _get_open(fname)
     with _open(fname, "rt") as src:

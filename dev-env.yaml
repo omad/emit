@@ -1,0 +1,59 @@
+name: emit-py10
+channels:
+  - conda-forge
+
+dependencies:
+  - python =3.10
+  - pip =23
+
+  # geo
+  - pyproj
+  - shapely
+  - rasterio
+  - rioxarray
+  - xarray >=2023.10.1
+  - cachetools
+  - geopandas
+  - dask
+  - s3fs
+  - datacube =1.8.17
+  - kerchunk
+  - tifffile
+  - duckdb
+
+  # extras for zarr-eosdis-store
+  - cachecontrol
+  - requests-futures
+
+  # plots
+  - folium
+  - ipyleaflet
+  - matplotlib
+  - seaborn
+  - cartopy
+
+  - jupyter
+  - ipykernel
+  - ipython
+  - jupytext
+
+  ## linting tools
+  - autopep8
+  - autoflake
+  - black >=23.1.0
+  - isort
+  - mypy
+  - pycodestyle
+  - pylint =3
+  - types-cachetools
+  - types-certifi
+  - tokenize-rt
+
+  ## test
+  - pytest
+  - pytest-cov
+  - pytest-timeout
+
+  - pip:
+      - ../odc-geo
+      #- zarr-eosdis-store
