@@ -15,7 +15,7 @@ NS = {
 }
 
 """ Default compression level """
-UNKNOWN_COMPRESSION_LEVEL = 4
+UNKNOWN_COMPRESSION_LEVEL = 9
 
 """ Data type mappings """
 TYPE_INFO = {
@@ -171,6 +171,7 @@ def array_to_zarr(node, dims, prefix=""):
     zarray = {
         "zarr_format": 2,
         "filters": None,
+        "compressor": None,
         "order": "C",
         "dtype": dtype,
         "shape": [],
@@ -195,13 +196,12 @@ def array_to_zarr(node, dims, prefix=""):
                     "id": "zlib",
                     "level": UNKNOWN_COMPRESSION_LEVEL,
                 }
-            elif compression in ("deflate shuffle", "shuffle deflate"):
-                zarray["compressor"] = {
-                    "id": "zlib",
-                    "level": UNKNOWN_COMPRESSION_LEVEL,
-                }
+            elif compression == "shuffle deflate":
                 size = int(dtype[2:])
-                zarray["filters"] = [{"id": "shuffle", "elementsize": size}]
+                zarray["filters"] = [
+                    {"id": "shuffle", "elementsize": size},
+                    {"id": "zlib", "level": UNKNOWN_COMPRESSION_LEVEL},
+                ]
             elif compression is None:
                 zarray["compressor"] = None
             else:
@@ -209,7 +209,7 @@ def array_to_zarr(node, dims, prefix=""):
             chunks = chunks_to_zarr(child)
             zarray.update(chunks["zarray"])
             zchunkstore = chunks["zchunkstore"]
-    # NOTE - this is null in test file
+
     zarray["fill_value"] = zattrs.get("_FillValue")
 
     # HARMONY-896: Automatic scale factor and offset filter.  Not yet working with all data types
@@ -223,6 +223,8 @@ def array_to_zarr(node, dims, prefix=""):
 
     if zarray.get("chunks") is None:
         zarray["chunks"] = zarray["shape"]
+        chunk_key = ".".join(["0"] * len(zarray["shape"]))
+        zchunkstore = {chunk_key: zchunkstore["0"]}
 
     zarr = {
         op.join(prefix, ".zarray"): zarray,
