@@ -45,7 +45,7 @@ def find_child(node, name):
     Returns:
         XML Element: XML Child Element
     """
-    return node.find(".//d:*[@name='%s']" % (name), NS)
+    return node.find(f".//d:*[@name='{name}']", NS)
 
 
 def get_attribute_values(node):
@@ -62,7 +62,7 @@ def get_attribute_values(node):
     return vals[0] if len(vals) == 1 else vals
 
 
-def get_attributes(node, exclude=[]):
+def get_attributes(node, exclude=()):
     """Get all children from a node that are Attributes
 
     Args:
@@ -94,18 +94,15 @@ def get_dimensions(root, group=None):
         group = root
 
     dim_infos = {
-        "/" + dim.attrib["name"]: {"size": int(dim.attrib["size"])}
-        for dim in group.findall("d:Dimension", NS)
+        "/" + dim.attrib["name"]: {"size": int(dim.attrib["size"])} for dim in group.findall("d:Dimension", NS)
     }
     for name in dim_infos:
         basename = name.split("/")[-1]
-        dim_node = root.find(
-            ".//d:*[@name='%s']/d:Dim[@name='%s']/.." % (basename, name), NS
-        )
+        dim_node = root.find(f".//d:*[@name='{basename}']/d:Dim[@name='{name}']/..", NS)
         if dim_node is None:
             # logger.warning(f"Could not find details for dimension {name}")
             continue
-        node = dim_node.find(f"./d:Attribute[@name='fullnamepath']/d:Value", NS)
+        node = dim_node.find("./d:Attribute[@name='fullnamepath']/d:Value", NS)
         if node:
             dim_infos[name]["path"] = node.text
         else:
@@ -165,7 +162,7 @@ def array_to_zarr(node, dims, prefix=""):
     """
     datatype = node.tag.split("}")[-1]
     dtype = TYPE_INFO[datatype][1]
-    pathnode = node.find(f"./d:Attribute[@name='fullnamepath']/d:Value", NS)
+    pathnode = node.find("./d:Attribute[@name='fullnamepath']/d:Value", NS)
     if pathnode is not None:
         prefix = op.join(prefix, pathnode.text).lstrip("/")
     else:
@@ -208,7 +205,7 @@ def array_to_zarr(node, dims, prefix=""):
             elif compression is None:
                 zarray["compressor"] = None
             else:
-                raise Exception("Unrecognized compressionType: " + compression)
+                raise ValueError("Unrecognized compressionType: " + compression)
             chunks = chunks_to_zarr(child)
             zarray.update(chunks["zarray"])
             zchunkstore = chunks["zchunkstore"]
@@ -257,9 +254,7 @@ def group_to_zarr(node, dims, prefix=""):
             zarr_array = array_to_zarr(child, dims, prefix=prefix)
             zarr.update(zarr_array)
         # otherwise, if this is group or a Container Attribute - this has not been tested
-        elif tag == "Group" or (
-            tag == "Attribute" and child.attrib.get("type", "") == "Container"
-        ):
+        elif tag == "Group" or (tag == "Attribute" and child.attrib.get("type", "") == "Container"):
             name = child.attrib["name"]
             # use for global .zattrs
             if name == "HDF5_GLOBAL":
