@@ -169,9 +169,11 @@ def to_zarr_spec(dmrpp_doc: str | bytes, url: str) -> dict[str, Any]:
             if k.endswith("/.zchunkstore"):
                 prefix, _ = k.rsplit("/", 1)
                 for chunk_key, info in v.items():
-                    yield f"{prefix}/{chunk_key}", json.dumps([url, info["offset"], info["size"]])
+                    yield f"{prefix}/{chunk_key}", json.dumps(
+                        [url, info["offset"], info["size"]], separators=(",", ":")
+                    )
             else:
-                yield k, json.dumps(v)
+                yield k, json.dumps(v, separators=(",", ":"))
 
     zz = to_zarr(dmrpp_doc)
     refs = dict(to_docs(zz))
