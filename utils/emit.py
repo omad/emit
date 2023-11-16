@@ -10,7 +10,7 @@ import json
 import requests
 from cachetools import cached
 from pathlib import Path
-from typing import Hashable, Any, Iterator
+from typing import Hashable, Any, Iterator, Iterable
 
 from odc.geo.math import affine_from_pts, quasi_random_r2
 from odc.geo import xy_, wh_
@@ -163,21 +163,47 @@ def slurp_emit_nc(nc_fname, bands):
         return {band: get_mmap_np(meta_store, band, mem).copy() for band in bands}
 
 
-def to_zarr_spec(dmrpp_doc: str | bytes, url: str) -> dict[str, Any]:
-    def to_docs(zz: dict[str, Any]) -> Iterator[tuple[str, str]]:
-        for k, v in zz.items():
+def _walk_dirs_up(p: str) -> Iterator[str]:
+    while True:
+        *d, _ = p.rsplit("/", 1)
+        if not d:
+            break
+        (p,) = d
+        yield p
+
+
+def _find_groups(all_paths: Iterable[str]) -> list[str]:
+    # group is any directory without .zarray in it
+    all_bands = set()
+    all_dirs = set()
+
+    for p in all_paths:
+        if p.endswith(".zarray"):
+            all_bands.add(p.rsplit("/", 1)[0])
+
+        for _dir in _walk_dirs_up(p):
+            if _dir in all_dirs:
+                break
+            all_dirs.add(_dir)
+
+    return list(all_dirs - all_bands)
+
+
+def to_zarr_spec(dmrpp_doc: str | bytes, url: str | None = None) -> dict[str, Any]:
+    def to_docs(zz: dict[str, Any]) -> Iterator[tuple[str, str | tuple[str | None, int, int]]]:
+        # sorted keys are needed to work around problem in fsspec directory listing 1430
+        for k in sorted(zz, key=lambda p: (p.count("/"), p)):
+            doc = zz[k]
             if k.endswith("/.zchunkstore"):
                 prefix, _ = k.rsplit("/", 1)
-                for chunk_key, info in v.items():
-                    yield f"{prefix}/{chunk_key}", json.dumps(
-                        [url, info["offset"], info["size"]], separators=(",", ":")
-                    )
+                for chunk_key, info in doc.items():
+                    yield f"{prefix}/{chunk_key}", (url, info["offset"], info["size"])
             else:
-                yield k, json.dumps(v, separators=(",", ":"))
+                yield k, json.dumps(doc, separators=(",", ":"))
 
     zz = to_zarr(dmrpp_doc)
+    zz.update({f"{group}/.zgroup": {"zarr_format": 2} for group in _find_groups(zz)})
     refs = dict(to_docs(zz))
-
     return {"version": 1, "refs": refs}
 
 

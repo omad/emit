@@ -54,8 +54,8 @@ def test_to_zarr_spec(dmrpp_sample):
     spec = to_zarr_spec(dmrpp_sample, url)
     assert list(spec) == ["version", "refs"]
     assert "reflectance/0.0.0" in spec["refs"]
-    xx = json.loads(spec["refs"]["reflectance/0.0.0"])
-    assert isinstance(xx, list)
+    xx = spec["refs"]["reflectance/0.0.0"]
+    assert isinstance(xx, tuple)
     assert len(xx) == 3
     assert xx[0] == url
     assert isinstance(xx[1], int)
