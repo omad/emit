@@ -5,11 +5,12 @@ EMIT helper functions.
 import mmap
 import os
 import sys
-import xml.etree.ElementTree as ElementTree
 from collections import namedtuple
+import json
 import requests
 from cachetools import cached
 from pathlib import Path
+from typing import Hashable, Any, Iterator
 
 from odc.geo.math import affine_from_pts, quasi_random_r2
 from odc.geo import xy_, wh_
@@ -22,8 +23,6 @@ from affine import Affine
 import numpy as np
 import xarray as xr
 from .vendor.eosdis_store.dmrpp import to_zarr
-from odc.geo import geom
-from odc.geo.gcp import GCPGeoBox
 
 from .txt import slurp
 
@@ -39,7 +38,7 @@ BBOX_KEYS = (
     "northernmost_latitude",
 )
 
-_creds_cache = {}
+_creds_cache: dict[Hashable, dict[str, Any]] = {}
 
 
 def earthdata_token(tk=None):
@@ -66,6 +65,7 @@ def fetch_s3_creds(tk=None):
     return requests.get(
         "https://data.lpdaac.earthdatacloud.nasa.gov/s3credentials",
         headers={"Authorization": f"Bearer {tk}"},
+        timeout=20,
     ).json()
 
 
@@ -115,24 +115,19 @@ def ortho_gbox(zarr_meta):
 
 def _parse_band_info(md_store, band=None):
     if band is None:
-        all_bands = [
-            n.rsplit("/", 1)[0] for n in md_store if n.endswith("/.zchunkstore")
-        ]
+        all_bands = [n.rsplit("/", 1)[0] for n in md_store if n.endswith("/.zchunkstore")]
         return {b: _parse_band_info(md_store, b) for b in all_bands}
 
     ii = md_store[f"{band}/.zarray"]
 
     shape, dtype, order, fill_value, compressor, filters = (
-        ii.get(k, None)
-        for k in ("shape", "dtype", "order", "fill_value", "compressor", "filters")
+        ii.get(k, None) for k in ("shape", "dtype", "order", "fill_value", "compressor", "filters")
     )
     shape = tuple(shape)
 
     cc = md_store[f"{band}/.zchunkstore"]
 
-    byte_ranges = {
-        k: slice(ch["offset"], ch["offset"] + ch["size"]) for k, ch in cc.items()
-    }
+    byte_ranges = {k: slice(ch["offset"], ch["offset"] + ch["size"]) for k, ch in cc.items()}
     if len(byte_ranges) == 1:
         (byte_ranges,) = byte_ranges.values()
 
@@ -160,8 +155,7 @@ def get_mmap_np(md_store, band, mem=None):
 def slurp_emit_nc(nc_fname, bands):
     doc = slurp(f"{nc_fname}.dmrpp")
 
-    node = ElementTree.fromstring(doc)
-    meta_store = to_zarr(node)
+    meta_store = to_zarr(doc)
 
     with open(nc_fname, "rb") as f:
         mem = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
@@ -194,12 +188,6 @@ def sample_error(xx, nsamples):
     gbox = xx.odc.geobox
     lon = xx.lon.data
     lat = xx.lat.data
-
-    def snap_to(x, y, off=0.5):
-        def op(x):
-            return [int(_x) + off for _x in x]
-
-        return op(x), op(y)
 
     pix_ = gbox.qr2sample(nsamples).transform(lambda x, y: snap_to(x, y, 0))
 
