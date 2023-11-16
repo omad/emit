@@ -163,6 +163,22 @@ def slurp_emit_nc(nc_fname, bands):
         return {band: get_mmap_np(meta_store, band, mem).copy() for band in bands}
 
 
+def to_zarr_spec(dmrpp_doc: str | bytes, url: str) -> dict[str, Any]:
+    def to_docs(zz: dict[str, Any]) -> Iterator[tuple[str, str]]:
+        for k, v in zz.items():
+            if k.endswith("/.zchunkstore"):
+                prefix, _ = k.rsplit("/", 1)
+                for chunk_key, info in v.items():
+                    yield f"{prefix}/{chunk_key}", json.dumps([url, info["offset"], info["size"]])
+            else:
+                yield k, json.dumps(v)
+
+    zz = to_zarr(dmrpp_doc)
+    refs = dict(to_docs(zz))
+
+    return {"version": 1, "refs": refs}
+
+
 def snap_to(x, y, off=0.5):
     def op(x):
         return [int(_x) + off for _x in x]

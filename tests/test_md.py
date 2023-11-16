@@ -2,6 +2,7 @@ import pytest
 from pystac.item import Item
 from utils._md import cmr_to_stac
 from utils.vendor.eosdis_store.dmrpp import to_zarr
+from utils.emit import to_zarr_spec
 from pathlib import Path
 import json
 
@@ -45,3 +46,17 @@ def test_dmrpp(dmrpp_sample):
     assert "reflectance/.zchunkstore" in zz
     assert list(zz["reflectance/.zchunkstore"]) == ["0.0.0"]
     assert list(zz["location/lon/.zchunkstore"]) == ["0.0"]
+
+
+def test_to_zarr_spec(dmrpp_sample):
+    url = "s3://fake/dummy.nc"
+
+    spec = to_zarr_spec(dmrpp_sample, url)
+    assert list(spec) == ["version", "refs"]
+    assert "reflectance/0.0.0" in spec["refs"]
+    xx = json.loads(spec["refs"]["reflectance/0.0.0"])
+    assert isinstance(xx, list)
+    assert len(xx) == 3
+    assert xx[0] == url
+    assert isinstance(xx[1], int)
+    assert isinstance(xx[2], int)
