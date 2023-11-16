@@ -4,6 +4,8 @@ from utils._md import cmr_to_stac
 from pathlib import Path
 import json
 
+# pylint: disable=redefined-outer-name
+
 
 @pytest.fixture
 def data_dir():

@@ -5,6 +5,10 @@ __all__ = ["cmr_to_stac"]
 
 
 class Cfg:
+    """
+    Configuration namespace.
+    """
+
     keep_keys = {"ORBIT", "ORBIT_SEGMENT", "SCENE", "SOLAR_ZENITH", "SOLAR_AZIMUTH"}
     transforms = {
         "ORBIT": str,
@@ -46,17 +50,9 @@ def _footprint(cmr):
 
 
 def cmr_to_stac(cmr):
-    uu = [
-        x["URL"]
-        for x in cmr["RelatedUrls"]
-        if x["Type"] in {"GET DATA VIA DIRECT ACCESS"}
-    ]
+    uu = [x["URL"] for x in cmr["RelatedUrls"] if x["Type"] in {"GET DATA VIA DIRECT ACCESS"}]
 
-    png_url, *_ = [
-        x["URL"]
-        for x in cmr["RelatedUrls"]
-        if x["URL"].startswith("https:") and x["URL"].endswith(".png")
-    ]
+    png_url, *_ = [x["URL"] for x in cmr["RelatedUrls"] if x["URL"].startswith("https:") and x["URL"].endswith(".png")]
 
     assets = {
         _asset_name_from_url(u): {
