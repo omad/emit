@@ -10,7 +10,7 @@ import json
 import requests
 from cachetools import cached
 from pathlib import Path
-from typing import Hashable, Any, Iterator, Iterable
+from typing import Hashable, Any, Iterator, Iterable, Literal
 
 from odc.geo.math import affine_from_pts, quasi_random_r2
 from odc.geo import xy_, wh_
@@ -25,6 +25,8 @@ import xarray as xr
 from .vendor.eosdis_store.dmrpp import to_zarr
 
 from .txt import slurp
+
+ZarrSpecMode = Literal["default"] | Literal["raw"]
 
 ChunkInfo = namedtuple(
     "ChunkInfo",
@@ -189,7 +191,59 @@ def _find_groups(all_paths: Iterable[str]) -> list[str]:
     return list(all_dirs - all_bands)
 
 
-def to_zarr_spec(dmrpp_doc: str | bytes, url: str | None = None) -> dict[str, Any]:
+def _do_edits(refs):
+    dims = {"downtrack": "y", "crosstrack": "x"}
+    coords = {
+        ("y", "x"): "lon lat",
+        ("bands",): "wavelengths",
+        ("y", "x", "bands"): "lon lat wavelengths",
+    }
+    drop_vars = ("location/glt_x", "location/glt_y", "build_dmrpp_metadata")
+    flatten_groups = ("location", "sensor_band_parameters")
+    skip_zgroups = set(f"{group}/.zgroup" for group in flatten_groups)
+    drop_ds_attrs = ("history", "geotransform")
+
+    def _keep(k):
+        p, *_ = k.rsplit("/", 1)
+        if p in drop_vars:
+            return False
+        if p in skip_zgroups:
+            return False
+        return True
+
+    def patch_zattrs(doc, dims, coords):
+        A_DIMS = "_ARRAY_DIMENSIONS"
+        assert isinstance(doc, dict)
+
+        if A_DIMS not in doc:
+            return doc
+
+        doc[A_DIMS] = [dims.get(dim, dim) for dim in doc[A_DIMS]]
+        if (coords := coords.get(tuple(doc[A_DIMS]), None)) is not None:
+            doc["coordinates"] = coords
+
+        return doc
+
+    def edit_one(k, doc):
+        if k.endswith("/.zattrs"):
+            doc = patch_zattrs(doc, dims, coords)
+        if k == ".zattrs":
+            doc = {k: v for k, v in doc.items() if k not in drop_ds_attrs}
+
+        group, *_ = k.rsplit("/", 2)
+        if group in flatten_groups:
+            k = k[len(group) + 1 :]
+
+        return (k, doc)
+
+    return dict(edit_one(k, doc) for k, doc in refs.items() if _keep(k))
+
+
+def to_zarr_spec(
+    dmrpp_doc: str | bytes,
+    url: str | None = None,
+    mode: ZarrSpecMode = "default",
+) -> dict[str, Any]:
     def to_docs(zz: dict[str, Any]) -> Iterator[tuple[str, str | tuple[str | None, int, int]]]:
         # sorted keys are needed to work around problem in fsspec directory listing 1430
         for k in sorted(zz, key=lambda p: (p.count("/"), p)):
@@ -202,7 +256,11 @@ def to_zarr_spec(dmrpp_doc: str | bytes, url: str | None = None) -> dict[str, An
                 yield k, json.dumps(doc, separators=(",", ":"))
 
     zz = to_zarr(dmrpp_doc)
-    zz.update({f"{group}/.zgroup": {"zarr_format": 2} for group in _find_groups(zz)})
+    if mode == "raw":
+        zz.update({f"{group}/.zgroup": {"zarr_format": 2} for group in _find_groups(zz)})
+    else:
+        zz = _do_edits(zz)
+
     refs = dict(to_docs(zz))
     return {"version": 1, "refs": refs}
 
