@@ -1,8 +1,8 @@
 import pytest
 from pystac.item import Item
-from utils._md import cmr_to_stac
-from utils.vendor.eosdis_store.dmrpp import to_zarr
-from utils.emit import to_zarr_spec
+from ._md import cmr_to_stac
+from .vendor.eosdis_store.dmrpp import to_zarr
+from ._emit import to_zarr_spec
 from pathlib import Path
 import json
 import fsspec
@@ -13,7 +13,7 @@ import xarray as xr
 
 @pytest.fixture
 def data_dir():
-    yield Path(__file__).parent / "data"
+    yield Path(__file__).parent / "test_data"
 
 
 @pytest.fixture

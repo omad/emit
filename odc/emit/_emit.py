@@ -2,7 +2,6 @@
 EMIT helper functions.
 """
 
-import mmap
 import os
 import sys
 from collections import namedtuple
@@ -23,8 +22,6 @@ from affine import Affine
 import numpy as np
 import xarray as xr
 from .vendor.eosdis_store.dmrpp import to_zarr
-
-from .txt import slurp
 
 ZarrSpecMode = Literal["default"] | Literal["raw"]
 
@@ -134,35 +131,6 @@ def _parse_band_info(md_store, band=None):
         (byte_ranges,) = byte_ranges.values()
 
     return ChunkInfo(shape, dtype, order, fill_value, byte_ranges, compressor, filters)
-
-
-def get_mmap_np(md_store, band, mem=None):
-    chunk = _parse_band_info(md_store, band)
-
-    if mem is None:
-        return chunk
-
-    assert chunk.compressor is None
-    assert chunk.filters is None
-
-    return np.ndarray(
-        chunk.shape,
-        dtype=chunk.dtype,
-        buffer=mem,
-        offset=chunk.byte_range.start,
-        order=chunk.order,
-    )
-
-
-def slurp_emit_nc(nc_fname, bands):
-    doc = slurp(f"{nc_fname}.dmrpp")
-
-    meta_store = to_zarr(doc)
-
-    with open(nc_fname, "rb") as f:
-        mem = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-
-        return {band: get_mmap_np(meta_store, band, mem).copy() for band in bands}
 
 
 def _walk_dirs_up(p: str) -> Iterator[str]:
@@ -302,49 +270,3 @@ def sample_error(xx, nsamples):
     pix_error = np.sqrt((ee**2).sum(axis=1))
 
     return pix_c, ww, pix_error, ee
-
-
-def emit_xr_read(fname, crs="utm", gcp_samples=1000):
-    nodata = -9999
-
-    reflectance, lon, lat, elev, wavelengths, good_wavelengths = slurp_emit_nc(
-        fname,
-        [
-            "reflectance",
-            "location/lon",
-            "location/lat",
-            "location/elev",
-            "sensor_band_parameters/wavelengths",
-            "sensor_band_parameters/good_wavelengths",
-        ],
-    ).values()
-
-    gbox = gbox_from_pix_lonlat(lon, lat, crs=crs, nsamples=gcp_samples)
-
-    cc = {
-        **xr_coords(gbox),
-        "lon": xr.DataArray(lon, dims=("y", "x"), attrs={"units": "degrees east"}),
-        "lat": xr.DataArray(lat, dims=("y", "x"), attrs={"units": "degrees north"}),
-    }
-
-    cc_band = {
-        "band": xr.DataArray(wavelengths, dims=("band",), attrs={"units": "nm"}),
-        "valid": xr.DataArray(good_wavelengths != 0, dims=("band",)),
-    }
-
-    return xr.Dataset(
-        {
-            "reflectance": xr.DataArray(
-                reflectance,
-                dims=("y", "x", "band"),
-                coords={**cc, **cc_band},
-                attrs={"nodata": nodata, "units": "unitless"},
-            ),
-            "elev": xr.DataArray(
-                elev,
-                dims=("y", "x"),
-                coords=cc,
-                attrs={"nodata": nodata, "units": "m"},
-            ),
-        }
-    )
