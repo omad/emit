@@ -1,7 +1,11 @@
-from odc.geo import geom
+from typing import Any
+from odc.geo import geom, xy_
+from odc.geo.gcp import GCPGeoBox, GCPMapping
 from toolz import get_in
 
 __all__ = ["cmr_to_stac"]
+
+SomeDoc = dict[str, Any]
 
 
 class Cfg:
@@ -11,7 +15,7 @@ class Cfg:
 
     keep_keys = {"ORBIT", "ORBIT_SEGMENT", "SCENE", "SOLAR_ZENITH", "SOLAR_AZIMUTH"}
     transforms = {
-        "ORBIT": str,
+        "ORBIT": int,
         "ORBIT_SEGMENT": int,
         "SCENE": int,
         "SOLAR_ZENITH": float,
@@ -49,10 +53,15 @@ def _footprint(cmr):
     )
 
 
-def cmr_to_stac(cmr):
+def cmr_to_stac(
+    cmr: SomeDoc,
+    shape: tuple[int, int] | dict[str, tuple[int, int]] | None = None,
+):
     uu = [x["URL"] for x in cmr["RelatedUrls"] if x["Type"] in {"GET DATA VIA DIRECT ACCESS"}]
 
-    png_url, *_ = [x["URL"] for x in cmr["RelatedUrls"] if x["URL"].startswith("https:") and x["URL"].endswith(".png")]
+    visual_url, *_ = [
+        x["URL"] for x in cmr["RelatedUrls"] if x["URL"].startswith("https:") and x["URL"].endswith(".png")
+    ]
 
     assets = {
         _asset_name_from_url(u): {
@@ -66,7 +75,7 @@ def cmr_to_stac(cmr):
     assets.update(
         {
             "visual": {
-                "href": png_url,
+                "href": visual_url,
                 "title": "Visual Preview",
                 "type": "image/png",
                 "roles": ["overview"],
@@ -88,14 +97,32 @@ def cmr_to_stac(cmr):
             "https://stac-extensions.github.io/view/v1.0.0/schema.json",
             "https://stac-extensions.github.io/eo/v1.1.0/schema.json",
             "https://stac-extensions.github.io/raster/v1.1.0/schema.json",
+            "https://stac-extensions.github.io/projection/v1.1.0/schema.json",
         ],
     }
+
+    if isinstance(shape, dict):
+        shape = shape.get(gg["id"], None)
+
+    proj_props: dict[str, Any] = {}
+    if shape is not None:
+        h, w = shape[:2]
+        pix = [xy_(0, 0), xy_(0, h), xy_(w, h), xy_(w, 0)]
+        wld = [xy_(x, y) for x, y in footprint.exterior.points[:4]]
+
+        gbox = GCPGeoBox((h, w), GCPMapping(pix, wld, 4326))
+        proj_props = {
+            "proj:epsg": gbox.crs.epsg,
+            "proj:shape": gbox.shape.shape,
+            "proj:transform": gbox.approx.affine[:6],
+        }
 
     attrs = {
         Cfg.renames.get(n, n): Cfg.transforms.get(n, lambda x: x)(v[0])
         for n, v in ((ee["Name"], ee["Values"]) for ee in cmr["AdditionalAttributes"])
         if n in Cfg.keep_keys
     }
+    # TODO: check math for zenith -> elevation conversion
     attrs["view:sun_elevation"] = 90 - attrs.pop("SOLAR_ZENITH")
 
     gg["properties"].update(
@@ -108,6 +135,7 @@ def cmr_to_stac(cmr):
             "platform": cmr["Platforms"][0]["ShortName"],
             "instruments": [p["ShortName"] for p in cmr["Platforms"][0]["Instruments"]],
             "gsd": Cfg.gsd,
+            **proj_props,
             **attrs,
         }
     )
