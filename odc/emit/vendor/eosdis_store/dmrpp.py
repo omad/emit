@@ -2,7 +2,7 @@ __all__ = ["to_zarr"]
 
 import logging
 import os.path as op
-import xml.etree.ElementTree as ElementTree
+from xml.etree import ElementTree
 
 logger = logging.getLogger(__name__)
 
@@ -160,6 +160,7 @@ def array_to_zarr(node, dims, prefix=""):
     Returns:
         dict: Zarr metadata for this DMRPP array
     """
+    # pylint: disable=too-many-locals
     datatype = node.tag.split("}")[-1]
     dtype = TYPE_INFO[datatype][1]
     pathnode = node.find("./d:Attribute[@name='fullnamepath']/d:Value", NS)
