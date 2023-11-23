@@ -180,11 +180,11 @@ def cmr_to_stac(
     cmr: SomeDoc,
     dmrpp_doc: str | bytes | None = None,
 ) -> SomeDoc:
+    # pylint: disable=too-many-locals
     shape: tuple[int, int] | None = None
     zz: SomeDoc | None = None
     if dmrpp_doc is not None:
         zz = to_zarr_spec(dmrpp_doc)
-        shape = shape_from_spec(zz)
 
     uu = [x["URL"] for x in cmr["RelatedUrls"] if x["Type"] in {"GET DATA VIA DIRECT ACCESS"}]
 
@@ -211,6 +211,10 @@ def cmr_to_stac(
             }
         }
     )
+
+    if zz is not None:
+        assets["RFL"].update({"zarr:spec": zz})
+        shape = shape_from_spec(zz)
 
     dt_range = cmr["TemporalExtent"]["RangeDateTime"]
     footprint = _footprint(cmr)

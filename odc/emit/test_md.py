@@ -44,6 +44,8 @@ def test_cmr(cmr_sample, dmrpp_sample):
     assert "id" in dd
     item = Item.from_dict(dd)
 
+    assert "zarr:spec" in item.assets["RFL"].to_dict()
+
 
 def test_dmrpp(dmrpp_sample):
     zz = to_zarr(dmrpp_sample)
