@@ -1,8 +1,7 @@
 import pytest
 from pystac.item import Item
-from ._md import cmr_to_stac
+from ._md import cmr_to_stac, to_zarr_spec
 from .vendor.eosdis_store.dmrpp import to_zarr
-from ._emit import to_zarr_spec
 from pathlib import Path
 import json
 import fsspec
@@ -32,13 +31,18 @@ def dmrpp_sample(data_dir):
     yield doc
 
 
-def test_cmr(cmr_sample):
+def test_cmr(cmr_sample, dmrpp_sample):
     dd = cmr_to_stac(cmr_sample)
     assert "id" in dd
     item = Item.from_dict(dd)
 
     assert len(item.assets) > 0
     assert item.datetime is not None
+
+    dd = cmr_to_stac(cmr_sample, dmrpp_sample)
+
+    assert "id" in dd
+    item = Item.from_dict(dd)
 
 
 def test_dmrpp(dmrpp_sample):
@@ -54,11 +58,9 @@ def test_dmrpp(dmrpp_sample):
 @pytest.mark.parametrize("url", (None, "s3://fake/dummy.nc"))
 def test_to_zarr_spec(dmrpp_sample, mode, url):
     spec = to_zarr_spec(dmrpp_sample, url, mode=mode)
-    assert list(spec) == ["version", "refs"]
-    refs = spec["refs"]
 
-    assert "reflectance/0.0.0" in refs
-    xx = refs["reflectance/0.0.0"]
+    assert "reflectance/0.0.0" in spec
+    xx = spec["reflectance/0.0.0"]
     assert isinstance(xx, tuple)
     assert len(xx) == 3
     assert xx[0] == url
@@ -73,14 +75,14 @@ def test_to_zarr_spec(dmrpp_sample, mode, url):
         return json.loads(fs.cat(k))
 
     if mode == "raw":
-        assert "location/lon/.zarray" in refs
+        assert "location/lon/.zarray" in spec
         assert _json("reflectance/.zattrs")["_ARRAY_DIMENSIONS"] == ["downtrack", "crosstrack", "bands"]
         assert "history" in _json(".zattrs")
         assert "geotransform" in _json(".zattrs")
         assert set(xx.data_vars) == set(["reflectance"])
         assert xx.reflectance.dims == ("downtrack", "crosstrack", "bands")
     else:
-        assert "lon/.zarray" in refs
+        assert "lon/.zarray" in spec
         assert "history" not in _json(".zattrs")
         assert "geotransform" not in _json(".zattrs")
         assert _json("reflectance/.zattrs")["coordinates"] == "lon lat wavelengths"

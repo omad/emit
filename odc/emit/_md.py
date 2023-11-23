@@ -1,11 +1,23 @@
-from typing import Any
+from typing import Any, Iterator, Iterable, Literal
 from odc.geo import geom, xy_
 from odc.geo.gcp import GCPGeoBox, GCPMapping
+from .vendor.eosdis_store.dmrpp import to_zarr
 from toolz import get_in
+import json
 
 __all__ = ["cmr_to_stac"]
 
 SomeDoc = dict[str, Any]
+
+
+ZarrSpecMode = Literal["default"] | Literal["raw"]
+
+BBOX_KEYS = (
+    "westernmost_longitude",
+    "southernmost_latitude",
+    "easternmost_longitude",
+    "northernmost_latitude",
+)
 
 
 class Cfg:
@@ -25,6 +37,117 @@ class Cfg:
         "SOLAR_AZIMUTH": "view:sun_azimuth",
     }
     gsd = 60
+
+
+def emit_id(url: str, postfix: str = "") -> str:
+    *_, _dir, _ = url.split("/")
+    return _dir + postfix
+
+
+def shape_from_spec(doc: SomeDoc) -> tuple[int, int]:
+    if "refs" in doc:
+        doc = doc["refs"]
+    return tuple(json.loads(doc["lon/.zarray"])["shape"])
+
+
+def _do_edits(refs):
+    dims = {"downtrack": "y", "crosstrack": "x"}
+    coords = {
+        ("y", "x"): "lon lat",
+        ("bands",): "wavelengths",
+        ("y", "x", "bands"): "lon lat wavelengths",
+    }
+    drop_vars = ("location/glt_x", "location/glt_y", "build_dmrpp_metadata")
+    flatten_groups = ("location", "sensor_band_parameters")
+    skip_zgroups = set(f"{group}/.zgroup" for group in flatten_groups)
+    drop_ds_attrs = ("history", "geotransform")
+
+    def _keep(k):
+        p, *_ = k.rsplit("/", 1)
+        if p in drop_vars:
+            return False
+        if p in skip_zgroups:
+            return False
+        return True
+
+    def patch_zattrs(doc, dims, coords):
+        A_DIMS = "_ARRAY_DIMENSIONS"
+        assert isinstance(doc, dict)
+
+        if A_DIMS not in doc:
+            return doc
+
+        doc[A_DIMS] = [dims.get(dim, dim) for dim in doc[A_DIMS]]
+        if (coords := coords.get(tuple(doc[A_DIMS]), None)) is not None:
+            doc["coordinates"] = coords
+
+        return doc
+
+    def edit_one(k, doc):
+        if k.endswith("/.zattrs"):
+            doc = patch_zattrs(doc, dims, coords)
+        if k == ".zattrs":
+            doc = {k: v for k, v in doc.items() if k not in drop_ds_attrs}
+
+        group, *_ = k.rsplit("/", 2)
+        if group in flatten_groups:
+            k = k[len(group) + 1 :]
+
+        return (k, doc)
+
+    return dict(edit_one(k, doc) for k, doc in refs.items() if _keep(k))
+
+
+def _walk_dirs_up(p: str) -> Iterator[str]:
+    while True:
+        *d, _ = p.rsplit("/", 1)
+        if not d:
+            break
+        (p,) = d
+        yield p
+
+
+def _find_groups(all_paths: Iterable[str]) -> list[str]:
+    # group is any directory without .zarray in it
+    all_bands = set()
+    all_dirs = set()
+
+    for p in all_paths:
+        if p.endswith(".zarray"):
+            all_bands.add(p.rsplit("/", 1)[0])
+
+        for _dir in _walk_dirs_up(p):
+            if _dir in all_dirs:
+                break
+            all_dirs.add(_dir)
+
+    return list(all_dirs - all_bands)
+
+
+def to_zarr_spec(
+    dmrpp_doc: str | bytes,
+    url: str | None = None,
+    mode: ZarrSpecMode = "default",
+) -> dict[str, Any]:
+    def to_docs(zz: dict[str, Any]) -> Iterator[tuple[str, str | tuple[str | None, int, int]]]:
+        # sorted keys are needed to work around problem in fsspec directory listing 1430
+        for k in sorted(zz, key=lambda p: (p.count("/"), p)):
+            doc = zz[k]
+            if k.endswith("/.zchunkstore"):
+                prefix, _ = k.rsplit("/", 1)
+                for chunk_key, info in doc.items():
+                    yield f"{prefix}/{chunk_key}", (url, info["offset"], info["size"])
+            else:
+                yield k, json.dumps(doc, separators=(",", ":"))
+
+    zz = to_zarr(dmrpp_doc)
+    if mode == "raw":
+        zz.update({f"{group}/.zgroup": {"zarr_format": 2} for group in _find_groups(zz)})
+    else:
+        zz = _do_edits(zz)
+
+    refs = dict(to_docs(zz))
+    return refs
 
 
 def _asset_name_from_url(u):
@@ -55,8 +178,14 @@ def _footprint(cmr):
 
 def cmr_to_stac(
     cmr: SomeDoc,
-    shape: tuple[int, int] | dict[str, tuple[int, int]] | None = None,
-):
+    dmrpp_doc: str | bytes | None = None,
+) -> SomeDoc:
+    shape: tuple[int, int] | None = None
+    zz: SomeDoc | None = None
+    if dmrpp_doc is not None:
+        zz = to_zarr_spec(dmrpp_doc)
+        shape = shape_from_spec(zz)
+
     uu = [x["URL"] for x in cmr["RelatedUrls"] if x["Type"] in {"GET DATA VIA DIRECT ACCESS"}]
 
     visual_url, *_ = [
@@ -100,9 +229,6 @@ def cmr_to_stac(
             "https://stac-extensions.github.io/projection/v1.1.0/schema.json",
         ],
     }
-
-    if isinstance(shape, dict):
-        shape = shape.get(gg["id"], None)
 
     proj_props: dict[str, Any] = {}
     if shape is not None:
