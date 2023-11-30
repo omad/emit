@@ -177,7 +177,7 @@ def _footprint(cmr):
 
 
 def cmr_to_stac(
-    cmr: SomeDoc,
+    cmr: SomeDoc | str | bytes,
     dmrpp_doc: str | bytes | None = None,
 ) -> SomeDoc:
     # pylint: disable=too-many-locals
@@ -185,6 +185,9 @@ def cmr_to_stac(
     zz: SomeDoc | None = None
     if dmrpp_doc is not None:
         zz = to_zarr_spec(dmrpp_doc)
+
+    if isinstance(cmr, (str, bytes)):
+        cmr = json.loads(cmr)
 
     uu = [x["URL"] for x in cmr["RelatedUrls"] if x["Type"] in {"GET DATA VIA DIRECT ACCESS"}]
 
