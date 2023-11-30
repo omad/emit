@@ -2,3 +2,9 @@ Data
 *pyc
 **/.ipynb_checkpoints/*
 .vscode/
+*.swp
+notebooks/odc
+utils
+notebooks/**/scratch-*ipynb
+notebooks/**/dbg-*ipynb
+
