@@ -8,6 +8,7 @@ import requests
 from cachetools import cached
 from pathlib import Path
 from typing import Hashable, Any
+from datetime import datetime, timezone, timedelta
 
 from odc.geo.math import affine_from_pts, quasi_random_r2
 from odc.geo import xy_, wh_
@@ -40,13 +41,24 @@ def earthdata_token(tk=None):
 
 
 @cached(_creds_cache)
-def fetch_s3_creds(tk=None):
+def _cached_s3_creds(tk=None):
     tk = earthdata_token(tk)
-    return requests.get(
+    creds = requests.get(
         "https://data.lpdaac.earthdatacloud.nasa.gov/s3credentials",
         headers={"Authorization": f"Bearer {tk}"},
         timeout=20,
     ).json()
+    creds["expiration"] = datetime.strptime(creds["expiration"], "%Y-%m-%d %H:%M:%S%z")
+    return creds
+
+
+def fetch_s3_creds(tk=None):
+    creds = _cached_s3_creds(tk)
+    t_now = datetime.now(timezone.utc)
+    if t_now - creds["expiration"] <= timedelta(seconds=60):
+        _creds_cache.clear()
+        creds = _cached_s3_creds(tk)
+    return creds
 
 
 def gxy(gg):
