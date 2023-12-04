@@ -41,10 +41,14 @@ def test_cmr(cmr_sample, dmrpp_sample):
 
     dd = cmr_to_stac(cmr_sample, dmrpp_sample)
 
+    # must be JSON serializable
+    assert json.dumps(dd) is not None
+
     assert "id" in dd
     item = Item.from_dict(dd)
 
-    assert "zarr:spec" in item.assets["RFL"].to_dict()
+    assert "zarr:metadata" in item.assets["RFL"].to_dict()
+    assert "zarr:chunks" in item.assets["RFL"].to_dict()
 
 
 def test_dmrpp(dmrpp_sample):
@@ -59,7 +63,8 @@ def test_dmrpp(dmrpp_sample):
 @pytest.mark.parametrize("mode", ("raw", "default"))
 @pytest.mark.parametrize("url", (None, "s3://fake/dummy.nc"))
 def test_to_zarr_spec(dmrpp_sample, mode, url):
-    spec = to_zarr_spec(dmrpp_sample, url, mode=mode)
+    spec, gbox = to_zarr_spec(dmrpp_sample, url, mode=mode)
+    assert gbox is None
 
     assert "reflectance/0.0.0" in spec
     xx = spec["reflectance/0.0.0"]

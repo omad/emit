@@ -1,9 +1,16 @@
-from typing import Any, Iterator, Iterable, Literal
-from odc.geo import geom, xy_
-from odc.geo.gcp import GCPGeoBox, GCPMapping
-from .vendor.eosdis_store.dmrpp import to_zarr
-from toolz import get_in
 import json
+from base64 import b64decode, b64encode
+from copy import deepcopy
+from typing import Any, Iterable, Iterator, Literal
+
+import fsspec
+import zarr.convenience as zc
+from odc.geo import MaybeCRS, geom, wh_, xy_
+from odc.geo.gcp import GCPGeoBox, GCPMapping
+from odc.geo.xr import xr_coords
+from toolz import get_in
+
+from .vendor.eosdis_store.dmrpp import to_zarr
 
 __all__ = ["cmr_to_stac"]
 
@@ -48,6 +55,15 @@ def shape_from_spec(doc: SomeDoc) -> tuple[int, int]:
     if "refs" in doc:
         doc = doc["refs"]
     return tuple(json.loads(doc["lon/.zarray"])["shape"])
+
+
+def pack_json(d: str | bytes) -> str:
+    return json.dumps(json.loads(d), separators=(",", ":"))
+
+
+def is_chunk_key(k: str) -> bool:
+    *_, leaf = k.rsplit("/", 1)
+    return leaf[0].isdigit()
 
 
 def _do_edits(refs):
@@ -127,8 +143,10 @@ def _find_groups(all_paths: Iterable[str]) -> list[str]:
 def to_zarr_spec(
     dmrpp_doc: str | bytes,
     url: str | None = None,
+    *,
     mode: ZarrSpecMode = "default",
-) -> dict[str, Any]:
+    footprint: geom.Geometry | None = None,
+) -> tuple[dict[str, Any], GCPGeoBox | None]:
     def to_docs(zz: dict[str, Any]) -> Iterator[tuple[str, str | tuple[str | None, int, int]]]:
         # sorted keys are needed to work around problem in fsspec directory listing 1430
         for k in sorted(zz, key=lambda p: (p.count("/"), p)):
@@ -146,8 +164,17 @@ def to_zarr_spec(
     else:
         zz = _do_edits(zz)
 
-    refs = dict(to_docs(zz))
-    return refs
+    spec = dict(to_docs(zz))
+    if footprint is None or mode == "raw":
+        return spec, None
+
+    ny, nx, *_ = shape_from_spec(spec)
+    pix = [xy_(0, 0), xy_(0, ny), xy_(nx, ny), xy_(nx, 0)]
+    wld = [xy_(x, y) for x, y in footprint.exterior.points[:4]]
+
+    gbox = GCPGeoBox(wh_(nx, ny), GCPMapping(pix, wld, footprint.crs))
+
+    return spec, gbox
 
 
 def _asset_name_from_url(u):
@@ -176,16 +203,24 @@ def _footprint(cmr):
     )
 
 
+def _json_safe_chunk(v):
+    if isinstance(v, bytes):
+        return b64encode(v).decode("ascii")
+    return v
+
+
+def _unjson_chunk(v):
+    if isinstance(v, str):
+        return b64decode(v.encode("ascii"))
+    return v
+
+
 def cmr_to_stac(
     cmr: SomeDoc | str | bytes,
     dmrpp_doc: str | bytes | None = None,
+    gcp_crs: MaybeCRS = None,
 ) -> SomeDoc:
     # pylint: disable=too-many-locals
-    shape: tuple[int, int] | None = None
-    zz: SomeDoc | None = None
-    if dmrpp_doc is not None:
-        zz = to_zarr_spec(dmrpp_doc)
-
     if isinstance(cmr, (str, bytes)):
         cmr = json.loads(cmr)
 
@@ -215,10 +250,6 @@ def cmr_to_stac(
         }
     )
 
-    if zz is not None:
-        assets["RFL"].update({"zarr:spec": zz})
-        shape = shape_from_spec(zz)
-
     dt_range = cmr["TemporalExtent"]["RangeDateTime"]
     footprint = _footprint(cmr)
 
@@ -238,17 +269,46 @@ def cmr_to_stac(
     }
 
     proj_props: dict[str, Any] = {}
-    if shape is not None:
-        h, w = shape[:2]
-        pix = [xy_(0, 0), xy_(0, h), xy_(w, h), xy_(w, 0)]
-        wld = [xy_(x, y) for x, y in footprint.exterior.points[:4]]
+    if dmrpp_doc is not None:
+        if gcp_crs is None:
+            spec, gbox = to_zarr_spec(dmrpp_doc, footprint=footprint)
+        else:
+            spec, gbox = to_zarr_spec(dmrpp_doc, footprint=footprint.to_crs(gcp_crs))
 
-        gbox = GCPGeoBox((h, w), GCPMapping(pix, wld, 4326))
+        assert gbox is not None
+
         proj_props = {
             "proj:epsg": gbox.crs.epsg,
             "proj:shape": gbox.shape.shape,
             "proj:transform": gbox.approx.affine[:6],
         }
+        zc.consolidate_metadata(spec)
+        md = json.loads(spec[".zmetadata"])["metadata"]
+        md["spatial_ref/.zarray"] = {
+            "chunks": [],
+            "compressor": None,
+            "dtype": "<i4",
+            "fill_value": None,
+            "filters": None,
+            "order": "C",
+            "shape": [],
+            "zarr_format": 2,
+        }
+        spatial_ref = xr_coords(gbox)["spatial_ref"]
+        md["spatial_ref/.zattrs"] = {
+            "_ARRAY_DIMENSIONS": [],
+            **spatial_ref.attrs,
+        }
+        md[".zattrs"]["coordinates"] = " ".join(["spatial_ref", "wavelengths", "lon", "lat"])
+
+        chunks = {k: _json_safe_chunk(v) for k, v in spec.items() if is_chunk_key(k)}
+        chunks["spatial_ref/0"] = _json_safe_chunk(spatial_ref.data.astype("<i4").tobytes())
+        assets["RFL"].update(
+            {
+                "zarr:metadata": md,
+                "zarr:chunks": chunks,
+            }
+        )
 
     attrs = {
         Cfg.renames.get(n, n): Cfg.transforms.get(n, lambda x: x)(v[0])
@@ -274,3 +334,87 @@ def cmr_to_stac(
     )
 
     return gg
+
+
+def subchunk_consolidated(
+    variable: str,
+    metadata: dict[str, Any],
+    chunk_store: dict[str, Any],
+    *,
+    factor: int | None = None,
+    rows_per_chunk: int | None = None,
+):
+    """
+    Subchunk consolidated metadata.
+
+    :param variable: variable name
+    :param metadata: parsed consolidated metadata dictionary
+    :param chunk_store: chunk store
+    :param factor: shrink factor
+    :param rows_per_chunk: alternative to ``factor``
+    :raises ValueError: when factor does not divide data into integer parts
+    :return: ``(metadata, chunk_store)`` modified in-place
+    """
+    # pylint: disable=too-many-locals
+    meta = metadata[f"{variable}/.zarray"]
+    chunks_orig = meta["chunks"]
+    if factor is None:
+        assert rows_per_chunk is not None
+        factor = chunks_orig[0] // rows_per_chunk
+
+    if chunks_orig[0] % factor == 0:
+        chunk_new = [chunks_orig[0] // factor] + chunks_orig[1:]
+    else:
+        raise ValueError("Must subchunk by exact integer factor")
+
+    meta["chunks"] = chunk_new
+    prefix = f"{variable}/"
+    chunk_keys = [k for k in chunk_store if k.startswith(prefix) and is_chunk_key(k)]
+
+    for k in chunk_keys:
+        url, offset, size = chunk_store[k]
+        kpart = k[len(prefix) :]
+        sep = "." if "." in kpart else "/"
+        idx = tuple(map(int, kpart.split(sep)))
+        new_chunk_sz = size // factor
+
+        ii = idx[0]
+        for _ in range(factor):
+            new_index = (ii, *idx[1:])
+            chunk_path = sep.join(str(idx) for idx in new_index)
+            chunk_store[f"{variable}/{chunk_path}"] = (url, offset, new_chunk_sz)
+            ii += 1
+            offset += new_chunk_sz
+
+    return metadata, chunk_store
+
+
+def fs_from_stac_doc(doc, fs, *, factor=None, rows_per_chunk=None, asset="RFL"):
+    src = doc["assets"][asset]
+
+    chunks = {k: _unjson_chunk(v) for k, v in src["zarr:chunks"].items()}
+    zmd = deepcopy(src["zarr:metadata"])
+
+    if factor is not None or rows_per_chunk is not None:
+        band_dims = {
+            k.rsplit("/", 1)[0]: tuple(v["_ARRAY_DIMENSIONS"])
+            for k, v in zmd.items()
+            if k.endswith("/.zattrs") and "_ARRAY_DIMENSIONS" in v
+        }
+
+        for band, dims in band_dims.items():
+            if len(dims) >= 2 and dims[0] == "y":
+                zmd, chunks = subchunk_consolidated(
+                    band,
+                    zmd,
+                    chunks,
+                    factor=factor,
+                    rows_per_chunk=rows_per_chunk,
+                )
+
+    md_store = {
+        ".zmetadata": json.dumps({"zarr_consolidated_format": 1, "metadata": zmd}),
+        **chunks,
+    }
+
+    return fsspec.filesystem("reference", fo=md_store, fs=fs, target=src["href"])

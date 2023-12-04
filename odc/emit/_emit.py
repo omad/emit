@@ -4,20 +4,18 @@ EMIT helper functions.
 
 import os
 import sys
-import requests
-from cachetools import cached
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Hashable, Any
-from datetime import datetime, timezone, timedelta
-
-from odc.geo.math import affine_from_pts, quasi_random_r2
-from odc.geo import xy_, wh_
-from odc.geo.geobox import GeoBox
-from odc.geo.gcp import GCPMapping, GCPGeoBox
-from odc.geo import geom
-from affine import Affine
+from typing import Any, Hashable
 
 import numpy as np
+import requests
+from affine import Affine
+from cachetools import cached
+from odc.geo import geom, wh_, xy_
+from odc.geo.gcp import GCPGeoBox, GCPMapping
+from odc.geo.geobox import GeoBox
+from odc.geo.math import affine_from_pts, quasi_random_r2
 
 _creds_cache: dict[Hashable, dict[str, Any]] = {}
 
@@ -134,7 +132,7 @@ def sample_error(xx, nsamples):
     pix_ = gbox.qr2sample(nsamples).transform(lambda x, y: snap_to(x, y, 0))
 
     iy, ix = gxy(pix_).astype(int).T
-    ww = geom.multipoint([(x, y) for x, y in zip(lon[ix, iy], lat[ix, iy])], 4326)
+    ww = geom.multipoint(list(zip(lon[ix, iy], lat[ix, iy])), 4326)
 
     pix_c = pix_.transform(lambda x, y: snap_to(x, y, 0.5))
 
