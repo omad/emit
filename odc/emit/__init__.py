@@ -3,6 +3,8 @@ from ._emit import (
     fetch_s3_creds,
     gbox_from_pix_lonlat,
     gbox_from_points,
+    gxy,
+    mk_error_plot,
     ortho_gbox,
     sample_error,
 )
@@ -24,6 +26,8 @@ __all__ = [
     "gbox_from_pix_lonlat",
     "ortho_gbox",
     "sample_error",
+    "mk_error_plot",
+    "gxy",
     "subchunk_consolidated",
     "fs_from_stac_doc",
 ]

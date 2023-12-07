@@ -6,10 +6,12 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Hashable
 
 import numpy as np
 import requests
+import xarray as xr
 from affine import Affine
 from cachetools import cached
 from odc.geo import geom, wh_, xy_
@@ -124,19 +126,70 @@ def sample_error_0(gbox, lon, lat, nsamples):
     return pix_c, ww, pix_error, ee
 
 
-def sample_error(xx, nsamples):
+def sample_error(xx: xr.Dataset, nsamples: int) -> SimpleNamespace:
     gbox = xx.odc.geobox
     lon = xx.lon.data
     lat = xx.lat.data
 
     pix_ = gbox.qr2sample(nsamples).transform(lambda x, y: snap_to(x, y, 0))
-
     iy, ix = gxy(pix_).astype(int).T
-    ww = geom.multipoint(list(zip(lon[ix, iy], lat[ix, iy])), 4326)
+    pts_p = pix_.transform(lambda x, y: snap_to(x, y, 0.5))
 
-    pix_c = pix_.transform(lambda x, y: snap_to(x, y, 0.5))
+    pts_w = geom.multipoint(list(zip(lon[ix, iy], lat[ix, iy])), 4326)
 
-    ee = gxy(pix_c) - gxy(gbox.project(ww))
+    ee = gxy(pts_p) - gxy(gbox.project(pts_w))
     pix_error = np.sqrt((ee**2).sum(axis=1))
 
-    return pix_c, ww, pix_error, ee
+    return SimpleNamespace(pts_p=pts_p, pts_w=pts_w, pix_error=pix_error, ee=ee)
+
+
+def mk_error_plot(xx: xr.Dataset, nsamples: int = 100) -> SimpleNamespace:
+    import seaborn as sns
+    from matplotlib import pyplot as plt
+
+    rr = sample_error(xx, nsamples)
+
+    fig, axd = plt.subplot_mosaic(
+        [
+            ["A", "A", "A", "B", "B"],
+            ["A", "A", "A", "B", "B"],
+            ["C", "C", "C", "C", "C"],
+        ],
+        figsize=(8, 8),
+    )
+    rr.fig = fig
+    rr.axd = axd
+
+    fig.suptitle(f"Pixel Registration Error (avg:{rr.pix_error.mean():.3f}px)")
+
+    sns.scatterplot(x=rr.ee.T[0], y=rr.ee.T[1], size=rr.pix_error, ax=axd["A"])
+    b = max(map(abs, axd["A"].axis()))
+    axd["A"].axis([-b, b, -b, b])
+    axd["A"].axvline(0, color="k", linewidth=0.3)
+    axd["A"].axhline(0, color="k", linewidth=0.3)
+
+    X, Y = gxy(rr.pts_p).T
+    sns.heatmap(
+        xx.reflectance.isel(bands=100),
+        cmap="bone",
+        alpha=0.7,
+        square=True,
+        cbar=False,
+        xticklabels=False,
+        yticklabels=False,
+        ax=axd["B"],
+    )
+    with plt.rc_context({"legend.loc": "lower right"}):
+        sns.scatterplot(
+            x=X,
+            y=Y,
+            size=rr.pix_error,
+            color="c",
+            alpha=0.5,
+            ax=axd["B"],
+        )
+
+    axd["C"].axvline(rr.pix_error.mean(), color="y")
+    sns.kdeplot(rr.pix_error, ax=axd["C"])
+    fig.tight_layout()
+    return rr
