@@ -53,7 +53,7 @@ def _cached_s3_creds(tk=None):
 def fetch_s3_creds(tk=None):
     creds = _cached_s3_creds(tk)
     t_now = datetime.now(timezone.utc)
-    if t_now - creds["expiration"] <= timedelta(seconds=60):
+    if creds["expiration"] - t_now <= timedelta(seconds=60):
         _creds_cache.clear()
         creds = _cached_s3_creds(tk)
     return creds
