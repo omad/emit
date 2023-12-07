@@ -44,6 +44,7 @@ class Cfg:
         "SOLAR_AZIMUTH": "view:sun_azimuth",
     }
     gsd = 60
+    default_pt_idx = (2, 3, 0, 1)
 
 
 def emit_id(url: str, postfix: str = "") -> str:
@@ -181,26 +182,24 @@ def _asset_name_from_url(u):
     return u.rsplit("/", 1)[-1].split("_")[2]
 
 
-def _footprint(cmr):
-    return geom.polygon(
+def _footprint(cmr, pts_index):
+    pts = get_in(
         [
-            (p["Longitude"], p["Latitude"])
-            for p in get_in(
-                [
-                    "SpatialExtent",
-                    "HorizontalSpatialDomain",
-                    "Geometry",
-                    "GPolygons",
-                    0,
-                    "Boundary",
-                    "Points",
-                ],
-                cmr,
-                no_default=True,
-            )
+            "SpatialExtent",
+            "HorizontalSpatialDomain",
+            "Geometry",
+            "GPolygons",
+            0,
+            "Boundary",
+            "Points",
         ],
-        4326,
+        cmr,
+        no_default=True,
     )
+    if pts_index is not None:
+        pts = [pts[i] for i in pts_index]
+
+    return geom.polygon([(p["Longitude"], p["Latitude"]) for p in pts], 4326)
 
 
 def _json_safe_chunk(v):
@@ -219,6 +218,7 @@ def cmr_to_stac(
     cmr: SomeDoc | str | bytes,
     dmrpp_doc: str | bytes | None = None,
     gcp_crs: MaybeCRS = None,
+    pts_idx: tuple[int, int, int, int] = Cfg.default_pt_idx,
 ) -> SomeDoc:
     # pylint: disable=too-many-locals
     if isinstance(cmr, (str, bytes)):
@@ -251,7 +251,7 @@ def cmr_to_stac(
     )
 
     dt_range = cmr["TemporalExtent"]["RangeDateTime"]
-    footprint = _footprint(cmr)
+    footprint = _footprint(cmr, pts_idx)
 
     gg = {
         "id": cmr["GranuleUR"],
