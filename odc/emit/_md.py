@@ -68,11 +68,11 @@ def is_chunk_key(k: str) -> bool:
 
 
 def _do_edits(refs):
-    dims = {"downtrack": "y", "crosstrack": "x"}
+    dims = {"downtrack": "y", "crosstrack": "x", "bands": "band"}
     coords = {
         ("y", "x"): "lon lat",
-        ("bands",): "wavelengths",
-        ("y", "x", "bands"): "lon lat wavelengths",
+        ("band",): "wavelengths",
+        ("y", "x", "band"): "lon lat wavelengths",
     }
     drop_vars = ("location/glt_x", "location/glt_y", "build_dmrpp_metadata")
     flatten_groups = ("location", "sensor_band_parameters")

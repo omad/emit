@@ -170,7 +170,7 @@ def mk_error_plot(xx: xr.Dataset, nsamples: int = 100) -> SimpleNamespace:
 
     X, Y = gxy(rr.pts_p).T
     sns.heatmap(
-        xx.reflectance.isel(bands=100),
+        xx.reflectance.isel(band=100),
         cmap="bone",
         alpha=0.7,
         square=True,

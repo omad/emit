@@ -1,11 +1,13 @@
+import json
+from pathlib import Path
+
+import fsspec
 import pytest
+import xarray as xr
 from pystac.item import Item
+
 from ._md import cmr_to_stac, to_zarr_spec
 from .vendor.eosdis_store.dmrpp import to_zarr
-from pathlib import Path
-import json
-import fsspec
-import xarray as xr
 
 # pylint: disable=redefined-outer-name
 
@@ -93,10 +95,10 @@ def test_to_zarr_spec(dmrpp_sample, mode, url):
         assert "history" not in _json(".zattrs")
         assert "geotransform" not in _json(".zattrs")
         assert _json("reflectance/.zattrs")["coordinates"] == "lon lat wavelengths"
-        assert _json("reflectance/.zattrs")["_ARRAY_DIMENSIONS"] == ["y", "x", "bands"]
+        assert _json("reflectance/.zattrs")["_ARRAY_DIMENSIONS"] == ["y", "x", "band"]
 
         assert set(xx.data_vars) == set(["reflectance", "good_wavelengths", "fwhm", "elev"])
-        assert set(xx.dims) == set(["y", "x", "bands"])
+        assert set(xx.dims) == set(["y", "x", "band"])
         assert set(xx.coords) == set(["lat", "lon", "wavelengths"])
         assert xx.lon.shape == xx.lat.shape
         assert xx.lon.shape == xx.reflectance.shape[:2]
