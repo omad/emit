@@ -143,7 +143,12 @@ def sample_error(xx: xr.Dataset, nsamples: int) -> SimpleNamespace:
     return SimpleNamespace(pts_p=pts_p, pts_w=pts_w, pix_error=pix_error, ee=ee)
 
 
-def mk_error_plot(xx: xr.Dataset, nsamples: int = 100) -> SimpleNamespace:
+def mk_error_plot(
+    xx: xr.Dataset,
+    nsamples: int = 100,
+    max_err_axis: float = -1,
+    msg: str = "",
+) -> SimpleNamespace:
     import seaborn as sns
     from matplotlib import pyplot as plt
 
@@ -160,10 +165,23 @@ def mk_error_plot(xx: xr.Dataset, nsamples: int = 100) -> SimpleNamespace:
     rr.fig = fig
     rr.axd = axd
 
-    fig.suptitle(f"Pixel Registration Error (avg:{rr.pix_error.mean():.3f}px)")
+    info = []
+    if epsg := xx.odc.crs.epsg:
+        info.append(f"epsg:{epsg}")
+
+    info.append(f"avg:{rr.pix_error.mean():.3f}px")
+    if msg:
+        info.append(msg)
+    info = " ".join(info)
+
+    fig.suptitle(f"Pixel Registration Error, {info}")
 
     sns.scatterplot(x=rr.ee.T[0], y=rr.ee.T[1], size=rr.pix_error, ax=axd["A"])
-    b = max(map(abs, axd["A"].axis()))
+    if max_err_axis > 0:
+        b = max_err_axis
+    else:
+        b = max(map(abs, axd["A"].axis()))
+
     axd["A"].axis([-b, b, -b, b])
     axd["A"].axvline(0, color="k", linewidth=0.3)
     axd["A"].axhline(0, color="k", linewidth=0.3)
@@ -190,6 +208,8 @@ def mk_error_plot(xx: xr.Dataset, nsamples: int = 100) -> SimpleNamespace:
         )
 
     axd["C"].axvline(rr.pix_error.mean(), color="y")
-    sns.kdeplot(rr.pix_error, ax=axd["C"])
+    sns.kdeplot(rr.pix_error, ax=axd["C"], clip=(0, b * 100))
+    *_, maxy = axd["C"].axis()
+    axd["C"].axis([0, b, 0, maxy])
     fig.tight_layout()
     return rr
