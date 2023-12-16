@@ -2,12 +2,94 @@ import functools
 from types import SimpleNamespace
 
 import numpy as np
-from odc.emit import gxy
+import xarray as xr
 from odc.geo import geom
 from odc.geo.gcp import GCPGeoBox, GCPMapping
 from odc.geo.geobox import GeoBox
+from odc.geo.math import quasi_random_r2
+from odc.geo.roi import polygon_path
 from rasterio.transform import GCPTransformer, GroundControlPoint, TransformerBase
+
+from odc.emit import fs_from_stac_doc, gxy
+
+from .zict import _stac_store
+
 # pylint: disable=import-outside-toplevel
+
+
+class SampleLoader:
+    """
+    Sample lon/lat/elev.
+
+    """
+
+    DROPS = ["reflectance", "fwhm", "good_wavelengths", "wavelengths"]
+
+    def __init__(self, pts, s3):
+        self._pts = pts
+        self._s3 = s3
+
+    def _doc_store(self):
+        return _stac_store()
+
+    def get(self, _id):
+        docs = self._doc_store()
+        xx = xr.open_dataset(
+            fs_from_stac_doc(docs[_id], self._s3).get_mapper(),
+            engine="zarr",
+            drop_variables=self.DROPS,
+        )
+        return {
+            "id": _id,
+            **_np_extract_sample(xx.lon.data, xx.lat.data, xx.elev.data, self._pts),
+        }
+
+
+def gen_sample(
+    n,
+    *,
+    n_edge="auto",
+    pad="auto",
+    npix_per_side_target=1280,
+):
+    if n_edge == "auto":
+        n_edge = int(np.round(np.sqrt(n)))
+
+    if pad == "auto":
+        pad = 0.25 * (1 / n_edge)
+    elif pad > 1:
+        pad = pad / npix_per_side_target
+
+    pts = np.vstack(
+        [
+            quasi_random_r2(n) * (1 - 2 * pad) + pad,
+            polygon_path(np.linspace(0, 1, n_edge), closed=False).T,
+        ]
+    )
+
+    return pts
+
+
+def sample_to_idx(pts, shape):
+    ny, nx = shape
+    iy, ix = [np.clip(np.round(a * (n - 1)).astype("int32"), 0, n - 1) for a, n in zip([pts.T[1], pts.T[0]], [ny, nx])]
+
+    return iy, ix
+
+
+def _np_extract_sample(x, y, z, pts):
+    iy, ix = sample_to_idx(pts, x.shape)
+    wx, wy, wz = [aa[iy, ix].ravel() for aa in (x, y, z)]
+
+    return {
+        "row": iy.tolist(),
+        "col": ix.tolist(),
+        "x": wx.tolist(),
+        "y": wy.tolist(),
+        "z": wz.tolist(),
+        "shape": x.shape,
+    }
+
 
 def _rio_gcp_transform(gg, tr, crs=4326):
     if gg.crs is None:
@@ -171,7 +253,7 @@ def mk_error_plot(
     if max_err_axis > 0:
         b = max_err_axis
     else:
-        b = max(map(abs, axd["A"].axis()))
+        b = max(map((lambda x: float(abs(x))), axd["A"].axis()))
 
     axd["A"].axis([-b, b, -b, b])
     axd["A"].axvline(0, color="k", linewidth=0.3)
