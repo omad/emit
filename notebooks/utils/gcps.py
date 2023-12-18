@@ -2,6 +2,7 @@ import functools
 from types import SimpleNamespace
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 from odc.geo import geom
 from odc.geo.gcp import GCPGeoBox, GCPMapping
@@ -154,6 +155,15 @@ def compute_error(sample, pt_mapper):
         ee=ee,
         shape=sample["shape"],
     )
+
+
+def to_pandas(sample):
+    xx = pd.DataFrame({k: sample[k] for k in ("row", "col", "x", "y", "z")})
+    xx.attrs["id"] = sample["id"]
+    xx.attrs["src_shape"] = sample["shape"]
+    xx.attrs["ny"] = sample["shape"][0]
+    xx.attrs["nx"] = sample["shape"][1]
+    return xx
 
 
 def sub_sample(sample, n, nside=None):
