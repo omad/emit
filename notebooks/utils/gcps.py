@@ -222,19 +222,33 @@ def mk_error_plot(
     rr,
     max_err_axis: float = -1,
     msg: str = "",
-    figsize=(8, 8),
+    figsize=None,
 ) -> SimpleNamespace:
     import seaborn as sns
     from matplotlib import pyplot as plt
 
-    fig, axd = plt.subplot_mosaic(
-        [
+    ui_mode = "square"
+    if rr.shape[0] > rr.shape[1] * 1.3:
+        ui_mode = "tall"
+
+    ui = {
+        "tall": [
             ["A", "A", "A", "B", "B"],
             ["A", "A", "A", "B", "B"],
             ["C", "C", "C", "C", "C"],
         ],
-        figsize=figsize,
-    )
+        "square": [
+            ["A", "A", "A", "B", "B", "B"],
+            ["A", "A", "A", "B", "B", "B"],
+            ["A", "A", "A", "B", "B", "B"],
+            ["C", "C", "C", "C", "C", "C"],
+        ],
+    }
+
+    if figsize is None:
+        figsize = {"square": (8, 6), "tall": (8, 8)}[ui_mode]
+
+    fig, axd = plt.subplot_mosaic(ui[ui_mode], figsize=figsize)
     rr.fig = fig
     rr.axd = axd
 
@@ -256,12 +270,15 @@ def mk_error_plot(
         b = max(map((lambda x: float(abs(x))), axd["A"].axis()))
 
     axd["A"].axis([-b, b, -b, b])
+    axd["A"].set_aspect(1)
     axd["A"].axvline(0, color="k", linewidth=0.3)
     axd["A"].axhline(0, color="k", linewidth=0.3)
+    axd["A"].set_aspect(1)
 
     X, Y = gxy(rr.pts_p).T
     with plt.rc_context({"legend.loc": "lower right"}):
         ax = axd["B"]
+        ax.set_aspect(1)
         sns.scatterplot(
             x=X,
             y=Y,
@@ -273,6 +290,7 @@ def mk_error_plot(
         ny, nx = rr.shape
         ax.axis([0, nx, ny, 0])
         ax.yaxis.tick_right()
+        ax.set_aspect(1)
 
     axd["C"].axvline(rr.pix_error.mean(), color="y")
     sns.kdeplot(rr.pix_error, ax=axd["C"], clip=(0, b * 100))
