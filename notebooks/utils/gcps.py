@@ -92,13 +92,13 @@ def _np_extract_sample(x, y, z, pts):
     }
 
 
-def _rio_gcp_transform(gg, tr, crs=4326):
+def _rio_gcp_transform(gg, tr, crs=4326, zs=None):
     if gg.crs is None:
         col, row = gxy(gg).T
         return geom.multipoint(list(zip(*tr.xy(row, col))), crs)
 
     x, y = gxy(gg).T
-    r, c = tr.rowcol(x, y, op=lambda a: a + 0.5)
+    r, c = tr.rowcol(x, y, zs=zs, op=lambda a: a + 0.5)
     return geom.multipoint(list(zip(c, r)), None)
 
 
@@ -137,7 +137,7 @@ def gcp_geobox(sample, nsample=None, crs=4326):
     return GCPGeoBox(sample["shape"], mapping)
 
 
-def compute_error(sample, pt_mapper):
+def compute_error(sample, pt_mapper, use_z=False):
     pts_w = geom.multipoint(list(zip(sample["x"], sample["y"])), 4326)
     pts_p = geom.multipoint([(x + 0.5, y + 0.5) for x, y in zip(sample["col"], sample["row"])], None)
     if isinstance(pt_mapper, TransformerBase):
@@ -146,7 +146,11 @@ def compute_error(sample, pt_mapper):
     if isinstance(pt_mapper, (GeoBox, GCPGeoBox)):
         project = pt_mapper.project
 
-    ee = gxy(pts_p) - gxy(project(pts_w))
+    if use_z:
+        ee = gxy(pts_p) - gxy(project(pts_w, zs=sample["z"]))
+    else:
+        ee = gxy(pts_p) - gxy(project(pts_w))
+
     pix_error = np.sqrt((ee**2).sum(axis=1))
     return SimpleNamespace(
         pts_p=pts_p,
