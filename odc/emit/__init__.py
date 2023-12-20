@@ -1,5 +1,6 @@
 from ._emit import (
     earthdata_token,
+    emit_load,
     fetch_s3_creds,
     gbox_from_pix_lonlat,
     gbox_from_points,
@@ -22,6 +23,7 @@ __all__ = [
     "fetch_s3_creds",
     "to_zarr_spec",
     "cmr_to_stac",
+    "emit_load",
     "gbox_from_points",
     "gbox_from_pix_lonlat",
     "ortho_gbox",

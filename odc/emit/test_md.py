@@ -6,6 +6,7 @@ import pytest
 import xarray as xr
 from pystac.item import Item
 
+from ._emit import emit_load
 from ._md import cmr_to_stac, to_zarr_spec
 from .vendor.eosdis_store.dmrpp import to_zarr
 
@@ -34,23 +35,29 @@ def dmrpp_sample(data_dir):
 
 
 def test_cmr(cmr_sample, dmrpp_sample):
-    dd = cmr_to_stac(cmr_sample)
-    assert "id" in dd
-    item = Item.from_dict(dd)
+    doc = cmr_to_stac(cmr_sample)
+    assert "id" in doc
+    item = Item.from_dict(doc)
 
     assert len(item.assets) > 0
     assert item.datetime is not None
 
-    dd = cmr_to_stac(cmr_sample, dmrpp_sample)
+    doc = cmr_to_stac(cmr_sample, dmrpp_sample)
 
     # must be JSON serializable
-    assert json.dumps(dd) is not None
+    assert json.dumps(doc) is not None
 
-    assert "id" in dd
-    item = Item.from_dict(dd)
+    assert "id" in doc
+    item = Item.from_dict(doc)
 
     assert "zarr:metadata" in item.assets["RFL"].to_dict()
     assert "zarr:chunks" in item.assets["RFL"].to_dict()
+
+    fs_fake = fsspec.filesystem("reference", fo={})
+    xx = emit_load(doc, fs_fake, chunks={"y": 32})
+    assert isinstance(xx, xr.Dataset)
+    assert "ortho_x" in xx.dims
+    assert "ortho_y" in xx.coords
 
 
 def test_dmrpp(dmrpp_sample):
@@ -78,7 +85,12 @@ def test_to_zarr_spec(dmrpp_sample, mode, url):
 
     fs = fsspec.filesystem("reference", fo=spec)
 
-    xx = xr.open_dataset(fs.get_mapper(""), engine="zarr", backend_kwargs={"consolidated": False}, chunks={})
+    xx = xr.open_dataset(
+        fs.get_mapper(""),
+        engine="zarr",
+        backend_kwargs={"consolidated": False},
+        chunks={},
+    )
 
     def _json(k):
         return json.loads(fs.cat(k))
@@ -97,8 +109,8 @@ def test_to_zarr_spec(dmrpp_sample, mode, url):
         assert _json("reflectance/.zattrs")["coordinates"] == "lon lat wavelengths"
         assert _json("reflectance/.zattrs")["_ARRAY_DIMENSIONS"] == ["y", "x", "band"]
 
-        assert set(xx.data_vars) == set(["reflectance", "good_wavelengths", "fwhm", "elev"])
-        assert set(xx.dims) == set(["y", "x", "band"])
+        assert set(xx.data_vars) == set(["reflectance", "good_wavelengths", "fwhm", "elev", "glt_x", "glt_y"])
+        assert set(xx.dims) == set(["y", "x", "band", "ortho_x", "ortho_y"])
         assert set(xx.coords) == set(["lat", "lon", "wavelengths"])
         assert xx.lon.shape == xx.lat.shape
         assert xx.lon.shape == xx.reflectance.shape[:2]

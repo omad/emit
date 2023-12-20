@@ -75,10 +75,11 @@ def _do_edits(refs):
         ("band",): "wavelengths",
         ("y", "x", "band"): "lon lat wavelengths",
     }
-    drop_vars = ("location/glt_x", "location/glt_y", "build_dmrpp_metadata")
+    drop_vars = set(["build_dmrpp_metadata"])
+    drop_ds_attrs = set(["history"])
+    attr_renames = {"geotransform": "ortho_geotransform"}
     flatten_groups = ("location", "sensor_band_parameters")
     skip_zgroups = set(f"{group}/.zgroup" for group in flatten_groups)
-    drop_ds_attrs = ("history", "geotransform")
 
     def _keep(k):
         p, *_ = k.rsplit("/", 1)
@@ -105,7 +106,7 @@ def _do_edits(refs):
         if k.endswith("/.zattrs"):
             doc = patch_zattrs(doc, dims, coords)
         if k == ".zattrs":
-            doc = {k: v for k, v in doc.items() if k not in drop_ds_attrs}
+            doc = {attr_renames.get(k, k): v for k, v in doc.items() if k not in drop_ds_attrs}
 
         group, *_ = k.rsplit("/", 2)
         if group in flatten_groups:
@@ -170,7 +171,7 @@ def to_zarr_spec(
     if footprint is None or mode == "raw":
         return spec, None
 
-    ny, nx, *_ = shape_from_spec(spec)
+    ny, nx = shape_from_spec(spec)
     pix = [xy_(0.0, 0.0), xy_(0.0, ny), xy_(float(nx), float(ny)), xy_(nx, 0.0)]
     wld = [xy_(x, y) for x, y in footprint.exterior.points[:4]]
 

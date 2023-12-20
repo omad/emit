@@ -18,6 +18,9 @@ from odc.geo import geom, wh_, xy_
 from odc.geo.gcp import GCPGeoBox, GCPMapping
 from odc.geo.geobox import GeoBox
 from odc.geo.math import affine_from_pts, quasi_random_r2
+from odc.geo.xr import xr_coords
+
+from ._md import fs_from_stac_doc
 
 _creds_cache: dict[Hashable, dict[str, Any]] = {}
 
@@ -149,6 +152,8 @@ def mk_error_plot(
     max_err_axis: float = -1,
     msg: str = "",
 ) -> SimpleNamespace:
+    # pylint: disable=import-outside-toplevel
+
     import seaborn as sns
     from matplotlib import pyplot as plt
 
@@ -180,7 +185,7 @@ def mk_error_plot(
     if max_err_axis > 0:
         b = max_err_axis
     else:
-        b = max(map(abs, axd["A"].axis()))
+        b = max(map(abs, axd["A"].axis()))  # type: ignore
 
     axd["A"].axis([-b, b, -b, b])
     axd["A"].axvline(0, color="k", linewidth=0.3)
@@ -213,3 +218,63 @@ def mk_error_plot(
     axd["C"].axis([0, b, 0, maxy])
     fig.tight_layout()
     return rr
+
+
+def emit_load(
+    stac_doc,
+    fs,
+    *,
+    chunks=None,
+    asset="RFL",
+) -> xr.Dataset:
+    rows_per_chunk: int | None = None
+
+    if isinstance(chunks, dict):
+        rows_per_chunk = chunks.get("y")
+
+    rfs = fs_from_stac_doc(
+        stac_doc,
+        fs,
+        rows_per_chunk=rows_per_chunk,
+        asset=asset,
+    )
+
+    xx = xr.open_dataset(
+        rfs.get_mapper(""),
+        engine="zarr",
+        chunks=chunks,
+    )
+
+    xx = xx.assign_coords(
+        {
+            "y": np.arange(xx.dims["y"]) + 0.5,
+            "x": np.arange(xx.dims["x"]) + 0.5,
+        }
+    )
+
+    if "ortho_x" not in xx.dims:
+        return xx
+
+    # construct spatial ref coordinate for glt_x/glt_y
+    tx, sx, _, ty, _, sy = xx.attrs["ortho_geotransform"]  # GDAL order
+    gbox = GeoBox(xx.glt_x.shape, Affine(sx, 0, tx, 0, sy, ty), 4326)
+    ortho_sr_coords = "ortho_spatial_ref"
+    oy, ox, ospatial = xr_coords(gbox, ortho_sr_coords).values()
+    ox = ox.rename({ox.dims[0]: "ortho_x"})
+    oy = oy.rename({oy.dims[0]: "ortho_y"})
+    xx = xx.assign_coords(
+        {
+            "ortho_x": ox,
+            "ortho_y": oy,
+            ortho_sr_coords: ospatial,
+        }
+    )
+
+    # record grid_mappings for spatial data vars
+    for dv in xx.data_vars.values():
+        if "ortho_y" in dv.dims:
+            dv.encoding["grid_mapping"] = ortho_sr_coords
+        elif "x" in dv.dims:
+            dv.encoding["grid_mapping"] = "spatial_ref"
+
+    return xx
