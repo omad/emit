@@ -55,7 +55,8 @@ def emit_id(url: str, postfix: str = "") -> str:
 def shape_from_spec(doc: SomeDoc) -> tuple[int, int]:
     if "refs" in doc:
         doc = doc["refs"]
-    return tuple(json.loads(doc["lon/.zarray"])["shape"])
+    ny, nx = json.loads(doc["lon/.zarray"])["shape"]
+    return (ny, nx)
 
 
 def pack_json(d: str | bytes) -> str:
@@ -170,7 +171,7 @@ def to_zarr_spec(
         return spec, None
 
     ny, nx, *_ = shape_from_spec(spec)
-    pix = [xy_(0, 0), xy_(0, ny), xy_(nx, ny), xy_(nx, 0)]
+    pix = [xy_(0.0, 0.0), xy_(0.0, ny), xy_(float(nx), float(ny)), xy_(nx, 0.0)]
     wld = [xy_(x, y) for x, y in footprint.exterior.points[:4]]
 
     gbox = GCPGeoBox(wh_(nx, ny), GCPMapping(pix, wld, footprint.crs))
@@ -224,6 +225,7 @@ def cmr_to_stac(
     if isinstance(cmr, (str, bytes)):
         cmr = json.loads(cmr)
 
+    assert isinstance(cmr, dict)
     uu = [x["URL"] for x in cmr["RelatedUrls"] if x["Type"] in {"GET DATA VIA DIRECT ACCESS"}]
 
     visual_url, *_ = [
@@ -276,6 +278,7 @@ def cmr_to_stac(
             spec, gbox = to_zarr_spec(dmrpp_doc, footprint=footprint.to_crs(gcp_crs))
 
         assert gbox is not None
+        assert gbox.crs is not None
 
         proj_props = {
             "proj:epsg": gbox.crs.epsg,
