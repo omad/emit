@@ -5,6 +5,7 @@ EMIT helper functions.
 import os
 import sys
 from datetime import datetime, timedelta, timezone
+from itertools import chain
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Hashable
@@ -271,7 +272,7 @@ def emit_load(
     )
 
     # record grid_mappings for spatial data vars
-    for dv in xx.data_vars.values():
+    for dv in chain(xx.data_vars.values(), xx.coords.values()):
         if "ortho_y" in dv.dims:
             dv.encoding["grid_mapping"] = ortho_sr_coords
         elif "x" in dv.dims:
