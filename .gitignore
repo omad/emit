@@ -6,4 +6,4 @@ Data
 notebooks/odc
 notebooks/**/scratch-*ipynb
 notebooks/**/dbg-*ipynb
-
+*.egg-info
