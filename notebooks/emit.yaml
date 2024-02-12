@@ -19,13 +19,25 @@ measurements:
     nodata: .nan
     units: "1"
     aliases: [rfl]
-    extra_dim: "wavelength"
+    dims: [y, x, wavelength]
     
   - name: elev
     dtype: float64
     nodata: .nan
     units: "1"
     aliases: [elevation]
+    
+  - name: fwhm
+    dtype: float32
+    nodata: .nan
+    units: "nm"
+    dims: [wavelength]
+
+  - name: good_wavelength
+    dtype: float32
+    nodata: .nan
+    units: "1"
+    dims: [wavelength]
 
 extra_dimensions:
   - name: wavelength
