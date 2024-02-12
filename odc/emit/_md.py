@@ -52,6 +52,15 @@ def emit_id(url: str, postfix: str = "") -> str:
     return _dir + postfix
 
 
+def parse_emit_orbit(item):
+    if isinstance(item, str):
+        _id = item
+    else:
+        _id = item.id
+
+    return int(_id.split("_")[-2])
+
+
 def shape_from_spec(doc: SomeDoc) -> tuple[int, int]:
     if "refs" in doc:
         doc = doc["refs"]
