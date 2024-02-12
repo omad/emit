@@ -1,14 +1,5 @@
-from ._emit import (
-    earthdata_token,
-    emit_load,
-    fetch_s3_creds,
-    gbox_from_pix_lonlat,
-    gbox_from_points,
-    gxy,
-    mk_error_plot,
-    ortho_gbox,
-    sample_error,
-)
+from ._creds import earthdata_token, fetch_s3_creds
+from ._load import emit_load, gbox_from_pix_lonlat, gbox_from_points, gxy, ortho_gbox
 from ._md import (
     ZarrSpecMode,
     cmr_to_stac,
@@ -16,6 +7,7 @@ from ._md import (
     subchunk_consolidated,
     to_zarr_spec,
 )
+from ._plots import mk_error_plot, sample_error
 
 __all__ = [
     "ZarrSpecMode",
