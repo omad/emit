@@ -6,4 +6,5 @@ Data
 notebooks/odc
 notebooks/**/scratch-*ipynb
 notebooks/**/dbg-*ipynb
+notebooks/trash/utils
 *.egg-info
