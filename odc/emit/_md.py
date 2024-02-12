@@ -394,7 +394,10 @@ def subchunk_consolidated(
 
 
 def fs_from_stac_doc(doc, fs, *, factor=None, rows_per_chunk=None, asset="RFL"):
-    src = doc["assets"][asset]
+    if assets := doc.get("assets", None):
+        src = assets[asset]
+    else:
+        src = doc
 
     chunks = {k: _unjson_chunk(v) for k, v in src["zarr:chunks"].items()}
     zmd = deepcopy(src["zarr:metadata"])

@@ -188,7 +188,7 @@ def mk_error_plot(
     else:
         b = max(map(abs, axd["A"].axis()))  # type: ignore
 
-    axd["A"].axis([-b, b, -b, b])
+    axd["A"].axis((-b, b, -b, b))
     axd["A"].axvline(0, color="k", linewidth=0.3)
     axd["A"].axhline(0, color="k", linewidth=0.3)
 
@@ -216,7 +216,7 @@ def mk_error_plot(
     axd["C"].axvline(rr.pix_error.mean(), color="y")
     sns.kdeplot(rr.pix_error, ax=axd["C"], clip=(0, b * 100))
     *_, maxy = axd["C"].axis()
-    axd["C"].axis([0, b, 0, maxy])
+    axd["C"].axis((0, b, 0, maxy))
     fig.tight_layout()
     return rr
 
@@ -228,6 +228,8 @@ def emit_load(
     chunks=None,
     asset="RFL",
 ) -> xr.Dataset:
+    # pylint: disable=too-many-locals
+
     rows_per_chunk: int | None = None
 
     if isinstance(chunks, dict):
