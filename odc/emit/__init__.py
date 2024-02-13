@@ -1,4 +1,4 @@
-from ._creds import earthdata_token, fetch_s3_creds
+from ._creds import earthdata_token, fetch_s3_creds, prep_s3_fs
 from ._gcps import SampleLoader, gcp_geobox, gen_sample
 from ._load import emit_load, gbox_from_pix_lonlat, gbox_from_points, ortho_gbox
 from ._md import (
@@ -23,6 +23,7 @@ __all__ = [
     "gcp_geobox",
     "earthdata_token",
     "fetch_s3_creds",
+    "prep_s3_fs",
     "to_zarr_spec",
     "emit_id",
     "parse_emit_orbit",

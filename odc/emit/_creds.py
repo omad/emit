@@ -53,3 +53,26 @@ def fetch_s3_creds(tk=None, fresh=False):
         _creds_cache.clear()
         creds = _cached_s3_creds(tk)
     return creds
+
+
+def prep_s3_fs(*, creds: dict[str, Any] | None = None, **kw):
+    # pylint: disable=import-outside-toplevel
+    import s3fs
+
+    if creds is None:
+        creds = fetch_s3_creds()
+
+    s3_opts = {
+        "key": creds["accessKeyId"],
+        "secret": creds["secretAccessKey"],
+        "token": creds["sessionToken"],
+        "anon": False,
+        **kw,
+    }
+
+    fs = s3fs.S3FileSystem(**s3_opts)
+    if isinstance(fs.protocol, list):
+        # fix for `s3fs < 2023.10.0`
+        fs.protocol = tuple(fs.protocol)
+
+    return fs
