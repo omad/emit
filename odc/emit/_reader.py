@@ -21,10 +21,10 @@ class EmitMD:
         if name == self.ASSET_RFL:
             # reflectance,lon,lat,elev
             return (
-                RasterBandMetadata("float32", -9999, dims=("y", "x", "wavelength")),
-                RasterBandMetadata("float32", -9999),
-                RasterBandMetadata("float32", -9999),
-                RasterBandMetadata("float64", -9999),
+                RasterBandMetadata("float32", -9999.0, dims=("y", "x", "wavelength")),
+                RasterBandMetadata("float64", -9999.0),
+                RasterBandMetadata("float64", -9999.0),
+                RasterBandMetadata("float64", -9999.0),
             )
         return ()
 
