@@ -11,11 +11,14 @@ from ._md import (
     to_zarr_spec,
 )
 from ._plots import gxy, mk_error_plot, review_gcp_sample, sample_error
+from ._reader import EmitMD, EmitReader
 from ._zict import open_zict, open_zict_json
 
 __all__ = [
     "ZarrSpecMode",
     "SampleLoader",
+    "EmitMD",
+    "EmitReader",
     "gen_sample",
     "gcp_geobox",
     "earthdata_token",

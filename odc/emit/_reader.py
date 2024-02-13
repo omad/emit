@@ -69,7 +69,7 @@ class EmitReader:
         self._ctx: EmitReader.Context | None = None
 
     @property
-    def md_parser(self):
+    def md_parser(self) -> EmitMD:
         return EmitMD()
 
     def capture_env(self) -> dict[str, Any]:
