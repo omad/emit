@@ -8,6 +8,8 @@ import numpy as np
 import xarray as xr
 from odc.geo import geom
 
+# pylint: disable=import-outside-toplevel
+
 
 def gxy(gg):
     return np.asarray(gg.json["coordinates"])
@@ -57,8 +59,6 @@ def mk_error_plot(
     max_err_axis: float = -1,
     msg: str = "",
 ) -> SimpleNamespace:
-    # pylint: disable=import-outside-toplevel
-
     import seaborn as sns
     from matplotlib import pyplot as plt
 
@@ -123,3 +123,54 @@ def mk_error_plot(
     axd["C"].axis((0, b, 0, maxy))
     fig.tight_layout()
     return rr
+
+
+def _style_cartopy_ax(ax, mode="all"):
+    import cartopy.feature as cfeature
+
+    ax.add_feature(cfeature.LAND)
+    ax.add_feature(cfeature.OCEAN)
+    ax.add_feature(cfeature.COASTLINE)
+
+    if mode == "all":
+        ax.add_feature(cfeature.BORDERS, linestyle=":")
+        ax.add_feature(cfeature.RIVERS)
+
+
+def review_gcp_sample(sample, figsize=(8, 6), s=50):
+    import cartopy.crs as ccrs
+    from matplotlib import pyplot as plt
+
+    ny, nx = sample["shape"]
+
+    fig, axd = plt.subplot_mosaic(
+        [
+            ["A", "A", "A", "B", "B"],
+            ["A", "A", "A", "B", "B"],
+            ["A", "A", "A", "B", "B"],
+            ["M", "M", "M", "B", "B"],
+        ],
+        figsize=figsize,
+        per_subplot_kw={
+            "M": {"projection": ccrs.PlateCarree()},
+            "A": {"projection": ccrs.PlateCarree()},
+        },
+    )
+
+    ax = axd["M"]
+    _style_cartopy_ax(ax, mode="basic")
+    ax.set_extent([-180, 180, -55, 70])
+    ax.scatter(sample["x"], sample["y"], c="r")
+
+    ax = axd["A"]
+    _style_cartopy_ax(ax)
+    _ = ax.scatter(sample["x"], sample["y"], c=sample["z"], s=s, alpha=0.5)
+
+    ax = axd["B"]
+    ax.scatter(sample["col"], sample["row"], c=sample["z"], s=s, alpha=1)
+    ax.axis([0, nx, ny, 0])
+    ax.axis("equal")
+    ax.yaxis.tick_right()
+
+    fig.tight_layout()
+    return fig, axd

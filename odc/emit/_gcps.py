@@ -137,7 +137,7 @@ def gcp_geobox(sample, nsample=None, crs=4326):
     return GCPGeoBox(sample["shape"], mapping)
 
 
-def compute_sample_error(sample, pt_mapper, use_z=False):
+def gcp_sample_error(sample, pt_mapper, use_z=False):
     pts_w = geom.multipoint(list(zip(sample["x"], sample["y"])), 4326)
     pts_p = geom.multipoint([(x + 0.5, y + 0.5) for x, y in zip(sample["col"], sample["row"])], None)
     if isinstance(pt_mapper, TransformerBase):
@@ -218,54 +218,3 @@ def sample_edge(sample, nside=None):
         return out
 
     return {k: _proc(v, k) for k, v in sample.items()}
-
-
-def _style_cartopy_ax(ax, mode="all"):
-    import cartopy.feature as cfeature
-
-    ax.add_feature(cfeature.LAND)
-    ax.add_feature(cfeature.OCEAN)
-    ax.add_feature(cfeature.COASTLINE)
-
-    if mode == "all":
-        ax.add_feature(cfeature.BORDERS, linestyle=":")
-        ax.add_feature(cfeature.RIVERS)
-
-
-def review_gcp_sample(sample, figsize=(8, 6), s=50):
-    import cartopy.crs as ccrs
-    from matplotlib import pyplot as plt
-
-    ny, nx = sample["shape"]
-
-    fig, axd = plt.subplot_mosaic(
-        [
-            ["A", "A", "A", "B", "B"],
-            ["A", "A", "A", "B", "B"],
-            ["A", "A", "A", "B", "B"],
-            ["M", "M", "M", "B", "B"],
-        ],
-        figsize=figsize,
-        per_subplot_kw={
-            "M": {"projection": ccrs.PlateCarree()},
-            "A": {"projection": ccrs.PlateCarree()},
-        },
-    )
-
-    ax = axd["M"]
-    _style_cartopy_ax(ax, mode="basic")
-    ax.set_extent([-180, 180, -55, 70])
-    ax.scatter(sample["x"], sample["y"], c="r")
-
-    ax = axd["A"]
-    _style_cartopy_ax(ax)
-    _ = ax.scatter(sample["x"], sample["y"], c=sample["z"], s=s, alpha=0.5)
-
-    ax = axd["B"]
-    ax.scatter(sample["col"], sample["row"], c=sample["z"], s=s, alpha=1)
-    ax.axis([0, nx, ny, 0])
-    ax.axis("equal")
-    ax.yaxis.tick_right()
-
-    fig.tight_layout()
-    return fig, axd
