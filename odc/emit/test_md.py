@@ -6,8 +6,7 @@ import pytest
 import xarray as xr
 from pystac.item import Item
 
-from ._emit import emit_load
-from ._md import cmr_to_stac, to_zarr_spec
+from . import cmr_to_stac, emit_load, to_zarr_spec
 from .vendor.eosdis_store.dmrpp import to_zarr
 
 # pylint: disable=redefined-outer-name

@@ -45,13 +45,3 @@ def open_zict_json(src, mode="a", level=6):
         json.loads,
         zstd,
     )
-
-
-def _stac_store():
-    # pylint: disable=protected-access
-    fname = "/tmp/emit.zip"
-    if (_cache := getattr(_stac_store, "_cache", None)) is not None:
-        return _cache
-
-    _stac_store._cache = open_zict_json(fname, "r")
-    return _stac_store._cache

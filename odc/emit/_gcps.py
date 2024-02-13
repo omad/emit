@@ -13,7 +13,6 @@ from rasterio.transform import GCPTransformer, GroundControlPoint, TransformerBa
 
 from ._load import fs_from_stac_doc
 from ._plots import gxy
-from ._zict import _stac_store
 
 # pylint: disable=import-outside-toplevel
 
@@ -31,7 +30,9 @@ class SampleLoader:
         self._s3 = s3
 
     def _doc_store(self):
-        return _stac_store()
+        from . import stac_store
+
+        return stac_store()
 
     def get(self, _id):
         docs = self._doc_store()

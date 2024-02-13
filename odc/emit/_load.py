@@ -76,8 +76,8 @@ def emit_load(
 
     xx = xx.assign_coords(
         {
-            "y": np.arange(xx.dims["y"]) + 0.5,
-            "x": np.arange(xx.dims["x"]) + 0.5,
+            "y": np.arange(xx.sizes["y"]) + 0.5,
+            "x": np.arange(xx.sizes["x"]) + 0.5,
         }
     )
 
