@@ -11,9 +11,9 @@ from odc.geo.math import quasi_random_r2
 from odc.geo.roi import polygon_path
 from rasterio.transform import GCPTransformer, GroundControlPoint, TransformerBase
 
-from odc.emit import fs_from_stac_doc, gxy
-
-from .zict import _stac_store
+from ._load import fs_from_stac_doc
+from ._plots import gxy
+from ._zict import _stac_store
 
 # pylint: disable=import-outside-toplevel
 
@@ -137,7 +137,7 @@ def gcp_geobox(sample, nsample=None, crs=4326):
     return GCPGeoBox(sample["shape"], mapping)
 
 
-def compute_error(sample, pt_mapper, use_z=False):
+def compute_sample_error(sample, pt_mapper, use_z=False):
     pts_w = geom.multipoint(list(zip(sample["x"], sample["y"])), 4326)
     pts_p = geom.multipoint([(x + 0.5, y + 0.5) for x, y in zip(sample["col"], sample["row"])], None)
     if isinstance(pt_mapper, TransformerBase):
@@ -220,7 +220,7 @@ def sample_edge(sample, nside=None):
     return {k: _proc(v, k) for k, v in sample.items()}
 
 
-def _style_ax(ax, mode="all"):
+def _style_cartopy_ax(ax, mode="all"):
     import cartopy.feature as cfeature
 
     ax.add_feature(cfeature.LAND)
@@ -232,89 +232,7 @@ def _style_ax(ax, mode="all"):
         ax.add_feature(cfeature.RIVERS)
 
 
-def mk_error_plot(
-    rr,
-    max_err_axis: float = -1,
-    msg: str = "",
-    figsize=None,
-) -> SimpleNamespace:
-    import seaborn as sns
-    from matplotlib import pyplot as plt
-
-    ui_mode = "square"
-    if rr.shape[0] > rr.shape[1] * 1.3:
-        ui_mode = "tall"
-
-    ui = {
-        "tall": [
-            ["A", "A", "A", "B", "B"],
-            ["A", "A", "A", "B", "B"],
-            ["C", "C", "C", "C", "C"],
-        ],
-        "square": [
-            ["A", "A", "A", "B", "B", "B"],
-            ["A", "A", "A", "B", "B", "B"],
-            ["A", "A", "A", "B", "B", "B"],
-            ["C", "C", "C", "C", "C", "C"],
-        ],
-    }
-
-    if figsize is None:
-        figsize = {"square": (8, 6), "tall": (8, 8)}[ui_mode]
-
-    fig, axd = plt.subplot_mosaic(ui[ui_mode], figsize=figsize)
-    rr.fig = fig
-    rr.axd = axd
-
-    info = []
-    if epsg := rr.pts_w.crs.epsg:
-        info.append(f"epsg:{epsg}")
-
-    info.append(f"avg:{rr.pix_error.mean():.3f}px")
-    if msg:
-        info.append(msg)
-    info = " ".join(info)
-
-    fig.suptitle(f"Pixel Registration Error, {info}")
-
-    sns.scatterplot(x=rr.ee.T[0], y=rr.ee.T[1], size=rr.pix_error, ax=axd["A"])
-    if max_err_axis > 0:
-        b = max_err_axis
-    else:
-        b = max(map((lambda x: float(abs(x))), axd["A"].axis()))
-
-    axd["A"].axis([-b, b, -b, b])
-    axd["A"].set_aspect(1)
-    axd["A"].axvline(0, color="k", linewidth=0.3)
-    axd["A"].axhline(0, color="k", linewidth=0.3)
-    axd["A"].set_aspect(1)
-
-    X, Y = gxy(rr.pts_p).T
-    with plt.rc_context({"legend.loc": "lower right"}):
-        ax = axd["B"]
-        ax.set_aspect(1)
-        sns.scatterplot(
-            x=X,
-            y=Y,
-            s=20,
-            c=rr.pix_error,
-            alpha=1,
-            ax=ax,
-        )
-        ny, nx = rr.shape
-        ax.axis([0, nx, ny, 0])
-        ax.yaxis.tick_right()
-        ax.set_aspect(1)
-
-    axd["C"].axvline(rr.pix_error.mean(), color="y")
-    sns.kdeplot(rr.pix_error, ax=axd["C"], clip=(0, b * 100))
-    *_, maxy = axd["C"].axis()
-    axd["C"].axis([0, b, 0, maxy])
-    fig.tight_layout()
-    return rr
-
-
-def review_sample(sample, figsize=(8, 6), s=50):
+def review_gcp_sample(sample, figsize=(8, 6), s=50):
     import cartopy.crs as ccrs
     from matplotlib import pyplot as plt
 
@@ -335,12 +253,12 @@ def review_sample(sample, figsize=(8, 6), s=50):
     )
 
     ax = axd["M"]
-    _style_ax(ax, mode="basic")
+    _style_cartopy_ax(ax, mode="basic")
     ax.set_extent([-180, 180, -55, 70])
     ax.scatter(sample["x"], sample["y"], c="r")
 
     ax = axd["A"]
-    _style_ax(ax)
+    _style_cartopy_ax(ax)
     _ = ax.scatter(sample["x"], sample["y"], c=sample["z"], s=s, alpha=0.5)
 
     ax = axd["B"]
