@@ -6,7 +6,7 @@ import numpy as np
 import zarr.convenience
 from odc.geo.geobox import GeoBox
 from odc.geo.roi import NormalizedROI
-from odc.stac.loader import RasterBandMetadata, RasterLoadParams, RasterSource
+from odc.loader import RasterBandMetadata, RasterLoadParams, RasterSource
 
 from ._creds import prep_s3_fs
 from ._md import fs_from_stac_doc
