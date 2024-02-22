@@ -12,6 +12,7 @@ from ._md import (
 )
 from ._plots import gxy, mk_error_plot, review_gcp_sample, sample_error
 from ._reader import EmitMD, EmitReader, open_zarr
+from ._version import __version__
 from ._zict import open_zict, open_zict_json
 
 __all__ = [
@@ -42,6 +43,7 @@ __all__ = [
     "open_zict_json",
     "stac_store",
     "open_zarr",
+    "__version__",
 ]
 
 
