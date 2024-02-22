@@ -1,5 +1,5 @@
 from ._creds import earthdata_token, fetch_s3_creds, prep_s3_fs
-from ._gcps import SampleLoader, gcp_geobox, gen_sample
+from ._gcps import SampleLoader, gcp_geobox, gen_sample, geobox_from_zarr
 from ._load import emit_load, gbox_from_pix_lonlat, gbox_from_points, ortho_gbox
 from ._md import (
     ZarrSpecMode,
@@ -11,7 +11,7 @@ from ._md import (
     to_zarr_spec,
 )
 from ._plots import gxy, mk_error_plot, review_gcp_sample, sample_error
-from ._reader import EmitMD, EmitReader, open_zarr
+from ._reader import EmitDriver, EmitMD, open_zarr
 from ._version import __version__
 from ._zict import open_zict, open_zict_json
 
@@ -19,9 +19,10 @@ __all__ = [
     "ZarrSpecMode",
     "SampleLoader",
     "EmitMD",
-    "EmitReader",
+    "EmitDriver",
     "gen_sample",
     "gcp_geobox",
+    "geobox_from_zarr",
     "earthdata_token",
     "fetch_s3_creds",
     "prep_s3_fs",

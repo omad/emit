@@ -6,7 +6,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Hashable
+from typing import TYPE_CHECKING, Any, Hashable
 
 import requests
 from cachetools import cached
@@ -55,7 +55,7 @@ def fetch_s3_creds(tk=None, fresh=False):
     return creds
 
 
-def prep_s3_fs(*, creds: dict[str, Any] | None = None, **kw):
+def prep_s3_fs(*, creds: dict[str, Any] | None = None, **kw) -> "s3fs.S3FileSystem":
     # pylint: disable=import-outside-toplevel
     import s3fs
 
@@ -76,3 +76,7 @@ def prep_s3_fs(*, creds: dict[str, Any] | None = None, **kw):
         fs.protocol = tuple(fs.protocol)
 
     return fs
+
+
+if TYPE_CHECKING:
+    import s3fs

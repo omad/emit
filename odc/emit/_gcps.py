@@ -17,6 +17,21 @@ from ._plots import gxy
 # pylint: disable=import-outside-toplevel
 
 
+def geobox_from_zarr(zz, gbox_sample_pts: np.ndarray | int | None = None, n_edge=9) -> GCPGeoBox:
+    if gbox_sample_pts is None:
+        gbox_sample_pts = gen_sample(200 - (n_edge - 1) * 4, n_edge=n_edge)
+    elif isinstance(gbox_sample_pts, int):
+        gbox_sample_pts = gen_sample(gbox_sample_pts - (n_edge - 1) * 4, n_edge=n_edge)
+
+    lon, lat = zz["lon"], zz["lat"]
+
+    iy, ix = sample_to_idx(gbox_sample_pts, lon.shape)
+    pix = np.stack([ix, iy]).T
+    wld = np.stack([lon[iy, ix], lat[iy, ix]]).T
+
+    return GCPGeoBox(lon.shape, GCPMapping(pix, wld, 4326))
+
+
 class SampleLoader:
     """
     Sample lon/lat/elev.
