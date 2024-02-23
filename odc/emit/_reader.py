@@ -9,7 +9,7 @@ import zarr.convenience
 from odc.geo.gcp import GCPGeoBox
 from odc.geo.geobox import GeoBox
 from odc.geo.overlap import compute_reproject_roi
-from odc.geo.roi import NormalizedROI, roi_is_empty
+from odc.geo.roi import NormalizedROI, roi_is_empty, roi_shape
 from odc.geo.warp import rio_reproject
 from odc.loader import (
     BandKey,
@@ -197,7 +197,9 @@ class EmitReader:
             ny, nx = dst_geobox.shape
             dtype = cfg.dtype or src.dtype
             assert dtype is not None
-            _dst = np.full((ny, nx, *postfix_dims), fill_value, dtype=dtype)
+            _dst = _np_alloc_yxb((ny, nx, *postfix_dims), dtype=dtype)
+
+        assert _dst.shape[:2] == dst_geobox.shape
 
         if roi_is_empty(rr.roi_dst):
             LOG.debug("empty roi_dst: %r", rr.roi_dst)
@@ -209,9 +211,14 @@ class EmitReader:
             np.copyto(_dst, fill_value)
             return (rr.roi_dst, _dst)
 
+        # Perform read with data transpose for 3D cases
+        # (y, x, band) -> (band, y, x) as fas as memory layout is concerned
         LOG.debug("native-read.start: %s orig.shape=%s, rows=%d:%d", band, src.shape, roi_src[0].start, roi_src[0].stop)
-        _src = src[roi_src]
+        _shape = (*roi_shape(roi_src), *postfix_dims)
+        _src = _np_alloc_yxb(_shape, dtype=src.dtype)
+        src.get_basic_selection(roi_src, out=_src)
         LOG.debug("native-read.stop: %s orig.shape=%s, rows=%d:%d", band, src.shape, roi_src[0].start, roi_src[0].stop)
+        del src
 
         assert isinstance(_src, np.ndarray)
         LOG.debug(
@@ -228,7 +235,7 @@ class EmitReader:
             src_nodata=src_nodata,
             ydim=0,
         )
-        LOG.debug("done with reproject: %s %s", band, src.shape)
+        LOG.debug("done with reproject: %s %s", band, _src.shape)
 
         return rr.roi_dst, _dst
 
@@ -276,6 +283,19 @@ class EmitDriver:
     @property
     def md_parser(self) -> EmitMD:
         return EmitMD()
+
+
+def _np_alloc_yxb(shape, **kw):
+    """
+    For 3D shapes, assume ``shape=(ny,nx,nb)`` annd allocate array of the given shape,
+    but with native pixel order being ``b,y,x`` in memory.
+
+    For all other shapes, just allocate array as usual.
+    """
+    if len(shape) != 3:
+        return np.empty(shape, **kw)
+    ny, nx, nb = shape
+    return np.empty((nb, ny, nx), **kw).transpose(1, 2, 0)
 
 
 def open_zarr(
