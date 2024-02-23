@@ -135,7 +135,7 @@ class EmitReader:
 
         def prep(self, src: RasterSource) -> Tuple[ZarrArray, GCPGeoBox]:
             doc = {"href": src.uri, **src.driver_data}
-            subdataset = doc["_subdataset"]
+            subdataset = src.subdataset or doc["_subdataset"]
             zz = open_zarr(doc, s3=self.s3, rows_per_chunk=32)
             gbox = self._cache.get_geobox(doc["href"], lambda _: geobox_from_zarr(zz))
             return zz[subdataset], gbox
