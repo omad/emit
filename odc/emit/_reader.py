@@ -21,6 +21,7 @@ from odc.loader import (
     resolve_dst_nodata,
     resolve_src_nodata,
 )
+from odc.loader._rio import capture_rio_env, rio_env
 from zarr.core import Array as ZarrArray
 
 from ._creds import prep_s3_fs
@@ -133,36 +134,57 @@ class EmitReader:
             self.finalised = True
             return self
 
-        def prep(self, src: RasterSource) -> Tuple[ZarrArray, GCPGeoBox]:
+        def prep(self, src: RasterSource) -> Tuple[dict[str, Any], str, GCPGeoBox]:
             doc = {"href": src.uri, **src.driver_data}
             subdataset = src.subdataset or doc["_subdataset"]
-            zz = open_zarr(doc, s3=self.s3, rows_per_chunk=32)
-            gbox = self._cache.get_geobox(doc["href"], lambda _: geobox_from_zarr(zz))
-            return zz[subdataset], gbox
+
+            def _fetch_gbox(href: str) -> GCPGeoBox:
+                zz = self.open_zarr(doc, href=href)
+                return geobox_from_zarr(zz)
+
+            gbox = self._cache.get_geobox(doc["href"], _fetch_gbox)
+            return doc, subdataset, gbox
+
+        def open_zarr(self, doc, href: str | None = None, **kw):
+            return open_zarr(doc, s3=self.s3, href=href, **kw)
 
         def __dask_tokenize__(self):
             return ("odc.emit.EmitReader.LoaderState", self.is_dask, self.s3)
 
-    def __init__(self, src: ZarrArray, gbox: GCPGeoBox, ctx: "EmitReader.LoaderState") -> None:
-        self._src = src
+    def __init__(self, doc: dict[str, Any], subdataset: str, gbox: GCPGeoBox, ctx: "EmitReader.LoaderState") -> None:
+        self._doc = doc
+        self._subdataset = subdataset
         self._gbox = gbox
         self._ctx = ctx
+        self._src = None
+
+    def __getstate__(self) -> dict[str, Any]:
+        return {"_doc": self._doc, "_subdataset": self._subdataset, "_gbox": self._gbox, "_ctx": self._ctx}
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        self._doc = state["_doc"]
+        self._subdataset = state["_subdataset"]
+        self._gbox = state["_gbox"]
+        self._ctx = state["_ctx"]
+        self._src = None
 
     def __dask_tokenize__(self):
-        return ("odc.emit.EmitReader", self._src, *self._ctx.__dask_tokenize__()[1:])
+        return ("odc.emit.EmitReader", self._doc, self._subdataset, *self._ctx.__dask_tokenize__()[1:])
 
     @staticmethod
     def open(src: RasterSource, ctx: "EmitReader.LoaderState") -> "EmitReader":
         LOG.info("EmitReader.open: %s", src.uri)
-        zarr_array, gbox = ctx.prep(src)
-        return EmitReader(zarr_array, gbox, ctx)
+        doc, subdataset, gbox = ctx.prep(src)
+        return EmitReader(doc, subdataset, gbox, ctx)
 
     @property
     def href(self) -> str:
-        try:
-            return self._src.chunk_store.fs.target
-        except AttributeError:
-            return "<???>"
+        return self._doc.get("href", "<???>")
+
+    def zarr(self) -> ZarrArray:
+        if self._src is None:
+            self._src = self._ctx.open_zarr(self._doc, rows_per_chunk=32)[self._subdataset]
+        return self._src
 
     def read(
         self,
@@ -171,9 +193,10 @@ class EmitReader:
         dst: Optional[np.ndarray] = None,
     ) -> Tuple[NormalizedROI, np.ndarray]:
         # pylint: disable=too-many-locals
-        src = self._src
-        band = src.basename
+        band = self._subdataset
         LOG.info("EmitReader.read: %s@%s", band, self.href)
+
+        src = self.zarr()
         src_nodata = resolve_src_nodata(getattr(src, "fill_value", None), cfg)
 
         postfix_dims = src.shape[2:]
@@ -185,7 +208,8 @@ class EmitReader:
         dst_nodata = resolve_dst_nodata(dst_dtype, cfg, src_nodata)
         fill_value = dst_nodata if dst_nodata is not None else 0
 
-        rr = compute_reproject_roi(src_gbox, dst_geobox, padding=16)
+        # align=32 is to align to block boundaries (rows_per_chunk)
+        rr = compute_reproject_roi(src_gbox, dst_geobox, padding=16, align=32)
         # only slice along y-axis
         roi_src = (rr.roi_src[0], slice(0, src.shape[1]))
         src_gbox = src_gbox[roi_src]
@@ -265,13 +289,16 @@ class EmitDriver:
 
     def capture_env(self) -> dict[str, Any]:
         LOG.debug("EmitDriver.capture_env")
-        return {}
+        return capture_rio_env()
 
     @contextmanager
     def restore_env(self, env: Dict[str, Any], load_state: EmitReader.LoaderState) -> Iterator[EmitReader.LoaderState]:
         assert isinstance(env, dict)
         LOG.debug("EmitDriver.restore_env")
-        yield load_state
+        # rasterio reproject inits GDAL, that can be costly across many threads
+        # this should cache GDAL thread context
+        with rio_env(**env):
+            yield load_state
 
     def open(
         self,
@@ -306,13 +333,14 @@ def open_zarr(
     rows_per_chunk: int | None = None,
     factor: int | None = None,
     s3_opts: dict[str, Any] | None = None,
+    href: str | None = None,
 ):
     if s3 is None:
         if s3_opts is None:
             s3_opts = {}
         s3 = prep_s3_fs(creds=creds, **s3_opts)
 
-    rfs = fs_from_stac_doc(doc, s3, rows_per_chunk=rows_per_chunk, factor=factor)
+    rfs = fs_from_stac_doc(doc, s3, href=href, rows_per_chunk=rows_per_chunk, factor=factor)
 
     zz = zarr.convenience.open(
         zarr.storage.ConsolidatedMetadataStore(rfs.get_mapper("")),

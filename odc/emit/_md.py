@@ -402,7 +402,7 @@ def subchunk_consolidated(
     return metadata, chunk_store
 
 
-def fs_from_stac_doc(doc, fs, *, factor=None, rows_per_chunk=None, asset="RFL"):
+def fs_from_stac_doc(doc, fs, *, factor=None, rows_per_chunk=None, asset="RFL", href: str | None = None):
     if assets := doc.get("assets", None):
         src = assets[asset]
     else:
@@ -432,5 +432,7 @@ def fs_from_stac_doc(doc, fs, *, factor=None, rows_per_chunk=None, asset="RFL"):
         ".zmetadata": json.dumps({"zarr_consolidated_format": 1, "metadata": zmd}),
         **chunks,
     }
+    if href is None:
+        href = src["href"]
 
-    return fsspec.filesystem("reference", fo=md_store, fs=fs, target=src["href"])
+    return fsspec.filesystem("reference", fo=md_store, fs=fs, target=href)
