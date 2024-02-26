@@ -1,3 +1,4 @@
+from ._check import dump_py_env
 from ._creds import earthdata_token, fetch_s3_creds, prep_s3_fs
 from ._gcps import SampleLoader, gcp_geobox, gen_sample, geobox_from_zarr
 from ._load import emit_load, gbox_from_pix_lonlat, gbox_from_points, ortho_gbox
@@ -43,6 +44,7 @@ __all__ = [
     "open_zict_json",
     "stac_store",
     "open_zarr",
+    "dump_py_env",
     "__version__",
 ]
 
