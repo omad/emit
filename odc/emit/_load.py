@@ -13,7 +13,7 @@ from odc.geo.geobox import GeoBox
 from odc.geo.math import affine_from_pts, quasi_random_r2
 from odc.geo.xr import xr_coords
 
-from ._md import fs_from_stac_doc
+from ._reader import fs_from_stac_doc
 
 
 def gbox_from_points(pix, wld, shape):

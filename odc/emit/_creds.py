@@ -5,6 +5,7 @@ Earthdata credentials
 import os
 import sys
 from datetime import datetime, timedelta, timezone
+from logging import getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Hashable
 
@@ -12,6 +13,8 @@ import requests
 from cachetools import cached
 
 _creds_cache: dict[Hashable, dict[str, Any]] = {}
+
+LOG = getLogger(__name__)
 
 
 def earthdata_token(tk=None):
@@ -60,6 +63,7 @@ def prep_s3_fs(*, creds: dict[str, Any] | None = None, **kw) -> "s3fs.S3FileSyst
     import s3fs
 
     if creds is None:
+        LOG.debug("Fetching S3 credentials")
         creds = fetch_s3_creds()
 
     s3_opts = {

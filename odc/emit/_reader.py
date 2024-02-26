@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 from contextlib import contextmanager
+from copy import deepcopy
 from logging import getLogger
 from typing import Any, Callable, Dict, Iterator, Optional, Tuple
 
+import fsspec
 import numpy as np
 import zarr.convenience
 from odc.geo.gcp import GCPGeoBox
@@ -26,7 +29,7 @@ from zarr.core import Array as ZarrArray
 
 from ._creds import prep_s3_fs
 from ._gcps import geobox_from_zarr
-from ._md import fs_from_stac_doc
+from ._md import _unjson_chunk, subchunk_consolidated
 from .assets import EMIT_WAVELENGTH_VALUES
 
 LOG = getLogger(__name__)
@@ -125,6 +128,7 @@ class EmitReader:
             return {"is_dask": self.is_dask, "s3": self.s3, "finalised": self.finalised}
 
         def __setstate__(self, state: dict[str, Any]) -> None:
+            LOG.debug("EmitReader.LoaderState.__setstate__: %r", state)
             self.is_dask = state["is_dask"]
             self.s3 = state["s3"]
             self.finalised = state["finalised"]
@@ -277,10 +281,10 @@ class EmitDriver:
         return ("odc.emit.EmitDriver", self._s3, self._creds)
 
     def new_load(self, chunks: None | Dict[str, int] = None) -> EmitReader.LoaderState:
+        LOG.debug("EmitDriver.new_load: chunks=%r", chunks)
         s3 = self._s3
         if s3 is None:
             s3 = prep_s3_fs(creds=self._creds)
-        LOG.debug("EmitDriver.new_load: chunks=%r", chunks)
         return EmitReader.LoaderState(chunks is not None, s3=s3)
 
     def finalise_load(self, load_state: EmitReader.LoaderState) -> Any:
@@ -338,7 +342,10 @@ def open_zarr(
     if s3 is None:
         if s3_opts is None:
             s3_opts = {}
+        LOG.debug("open_zarr: prepping s3")
         s3 = prep_s3_fs(creds=creds, **s3_opts)
+    else:
+        LOG.debug("open_zarr: using provided s3: %r", id(s3))
 
     rfs = fs_from_stac_doc(doc, s3, href=href, rows_per_chunk=rows_per_chunk, factor=factor)
 
@@ -349,3 +356,39 @@ def open_zarr(
     )
 
     return zz
+
+
+def fs_from_stac_doc(doc, fs, *, factor=None, rows_per_chunk=None, asset="RFL", href: str | None = None):
+    if assets := doc.get("assets", None):
+        src = assets[asset]
+    else:
+        src = doc
+
+    chunks = {k: _unjson_chunk(v) for k, v in src["zarr:chunks"].items()}
+    zmd = deepcopy(src["zarr:metadata"])
+
+    if factor is not None or rows_per_chunk is not None:
+        band_dims = {
+            k.rsplit("/", 1)[0]: tuple(v["_ARRAY_DIMENSIONS"])
+            for k, v in zmd.items()
+            if k.endswith("/.zattrs") and "_ARRAY_DIMENSIONS" in v
+        }
+
+        for band, dims in band_dims.items():
+            if len(dims) >= 2 and dims[0] == "y":
+                zmd, chunks = subchunk_consolidated(
+                    band,
+                    zmd,
+                    chunks,
+                    factor=factor,
+                    rows_per_chunk=rows_per_chunk,
+                )
+
+    md_store = {
+        ".zmetadata": json.dumps({"zarr_consolidated_format": 1, "metadata": zmd}),
+        **chunks,
+    }
+    if href is None:
+        href = src["href"]
+
+    return fsspec.filesystem("reference", fo=md_store, fs=fs, target=href)

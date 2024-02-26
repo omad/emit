@@ -1,9 +1,7 @@
 import json
 from base64 import b64decode, b64encode
-from copy import deepcopy
 from typing import Any, Iterable, Iterator, Literal
 
-import fsspec
 import zarr.convenience as zc
 from odc.geo import MaybeCRS, geom, wh_, xy_
 from odc.geo.gcp import GCPGeoBox, GCPMapping
@@ -400,39 +398,3 @@ def subchunk_consolidated(
             offset += new_chunk_sz
 
     return metadata, chunk_store
-
-
-def fs_from_stac_doc(doc, fs, *, factor=None, rows_per_chunk=None, asset="RFL", href: str | None = None):
-    if assets := doc.get("assets", None):
-        src = assets[asset]
-    else:
-        src = doc
-
-    chunks = {k: _unjson_chunk(v) for k, v in src["zarr:chunks"].items()}
-    zmd = deepcopy(src["zarr:metadata"])
-
-    if factor is not None or rows_per_chunk is not None:
-        band_dims = {
-            k.rsplit("/", 1)[0]: tuple(v["_ARRAY_DIMENSIONS"])
-            for k, v in zmd.items()
-            if k.endswith("/.zattrs") and "_ARRAY_DIMENSIONS" in v
-        }
-
-        for band, dims in band_dims.items():
-            if len(dims) >= 2 and dims[0] == "y":
-                zmd, chunks = subchunk_consolidated(
-                    band,
-                    zmd,
-                    chunks,
-                    factor=factor,
-                    rows_per_chunk=rows_per_chunk,
-                )
-
-    md_store = {
-        ".zmetadata": json.dumps({"zarr_consolidated_format": 1, "metadata": zmd}),
-        **chunks,
-    }
-    if href is None:
-        href = src["href"]
-
-    return fsspec.filesystem("reference", fo=md_store, fs=fs, target=href)

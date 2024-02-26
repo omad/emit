@@ -11,7 +11,6 @@ from odc.geo.math import quasi_random_r2
 from odc.geo.roi import polygon_path
 from rasterio.transform import GCPTransformer, GroundControlPoint, TransformerBase
 
-from ._load import fs_from_stac_doc
 from ._plots import gxy
 
 # pylint: disable=import-outside-toplevel
@@ -50,6 +49,8 @@ class SampleLoader:
         return stac_store()
 
     def get(self, _id):
+        from ._reader import fs_from_stac_doc
+
         docs = self._doc_store()
         xx = xr.open_dataset(
             fs_from_stac_doc(docs[_id], self._s3).get_mapper(),

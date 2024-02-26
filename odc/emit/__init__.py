@@ -5,13 +5,12 @@ from ._md import (
     ZarrSpecMode,
     cmr_to_stac,
     emit_id,
-    fs_from_stac_doc,
     parse_emit_orbit,
     subchunk_consolidated,
     to_zarr_spec,
 )
 from ._plots import gxy, mk_error_plot, review_gcp_sample, sample_error
-from ._reader import EmitDriver, EmitMD, open_zarr
+from ._reader import EmitDriver, EmitMD, fs_from_stac_doc, open_zarr
 from ._version import __version__
 from ._zict import open_zict, open_zict_json
 
