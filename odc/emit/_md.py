@@ -417,7 +417,7 @@ async def emit_doc_stream(
     Returns:
         (id, doc) sequence
     """
-    # pylint: disable=protected-access
+    # pylint: disable=protected-access,too-many-locals
     if s3 is None:
         s3 = prep_s3_fs(creds=creds)
 
@@ -452,6 +452,12 @@ async def emit_doc_stream(
             else:
                 if cmr is None:
                     yield _id, None
-                yield _id, cmr_to_stac(cmr, dmrpp)
+                try:
+                    doc = cmr_to_stac(cmr, dmrpp)
+                except Exception as e:  # pylint: disable=broad-except
+                    print(f"Error processing: {_id} {e}")
+                    continue
+
+                yield _id, doc
 
     await session.close()
