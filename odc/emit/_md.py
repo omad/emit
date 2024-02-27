@@ -1,3 +1,4 @@
+import asyncio
 import json
 from base64 import b64decode, b64encode
 from typing import Any, Iterable, Iterator, Literal
@@ -8,6 +9,7 @@ from odc.geo.gcp import GCPGeoBox, GCPMapping
 from odc.geo.xr import xr_coords
 from toolz import get_in
 
+from ._creds import prep_s3_fs
 from .vendor.eosdis_store.dmrpp import to_zarr
 
 __all__ = ["cmr_to_stac"]
@@ -398,3 +400,58 @@ def subchunk_consolidated(
             offset += new_chunk_sz
 
     return metadata, chunk_store
+
+
+async def emit_doc_stream(
+    root="lp-prod-protected/EMITL2ARFL.001/",
+    *,
+    s3=None,
+    creds=None,
+    batch=10,
+    raw=False,
+    verbose=True,
+):
+    """
+    Read from .cmr.json and .nc.dmrpp from S3 and convert those to STAC documents.
+
+    Returns:
+        (id, doc) sequence
+    """
+    # pylint: disable=protected-access
+    if s3 is None:
+        s3 = prep_s3_fs(creds=creds)
+
+    session = await s3.set_session()
+    if verbose:
+        print(f"Running initial directory listing: {root}")
+    dirs = await s3._ls(root)
+
+    if verbose:
+        print(f"... done {len(dirs)}")
+
+    async def _proc(prefix: str):
+        _, _id = prefix.rsplit("/", 1)
+        try:
+            cmr_json = await s3._cat(f"{prefix}/{_id}.cmr.json")
+            dmrpp = await s3._cat(f"{prefix}/{_id}.nc.dmrpp")
+            return _id, cmr_json, dmrpp
+        except Exception as e:  # pylint: disable=broad-except
+            if verbose:
+                print(f"Error processing: {prefix} {_id} {e}")
+            return _id, None, None
+
+    def _chunked(dd, sz):
+        N = len(dd)
+        for i in range(0, N, sz):
+            yield dd[i : min(N, i + sz)]
+
+    for chunk in _chunked(dirs, batch):
+        for _id, cmr, dmrpp in await asyncio.gather(*[_proc(d) for d in chunk]):
+            if raw:
+                yield _id, cmr, dmrpp
+            else:
+                if cmr is None:
+                    yield _id, None
+                yield _id, cmr_to_stac(cmr, dmrpp)
+
+    await session.close()

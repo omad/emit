@@ -5,6 +5,7 @@ from ._load import emit_load, gbox_from_pix_lonlat, gbox_from_points, ortho_gbox
 from ._md import (
     ZarrSpecMode,
     cmr_to_stac,
+    emit_doc_stream,
     emit_id,
     parse_emit_orbit,
     subchunk_consolidated,
@@ -27,6 +28,7 @@ __all__ = [
     "fetch_s3_creds",
     "prep_s3_fs",
     "to_zarr_spec",
+    "emit_doc_stream",
     "emit_id",
     "parse_emit_orbit",
     "cmr_to_stac",
