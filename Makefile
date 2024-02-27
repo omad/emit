@@ -1,3 +1,6 @@
+pull:
+	~/.envs/emit/bin/python -m pip install --ignore-installed --no-deps "git+https://github.com/csiro-easi/emit"
+	
 easi-env:
 	./scripts/setup-py-env.sh
 
