@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 import xarray as xr
 from odc.geo import geom
+from odc.geo.xr import ODCExtensionDa
 
 # pylint: disable=import-outside-toplevel
 
@@ -54,15 +55,24 @@ def sample_error(xx: xr.Dataset, nsamples: int) -> SimpleNamespace:
 
 
 def mk_error_plot(
-    xx: xr.Dataset,
-    nsamples: int = 100,
+    xx: xr.Dataset | SimpleNamespace,
+    nsamples: int | SimpleNamespace = 100,
     max_err_axis: float = -1,
     msg: str = "",
 ) -> SimpleNamespace:
+    # pylint: disable=too-many-locals
     import seaborn as sns
     from matplotlib import pyplot as plt
 
-    rr = sample_error(xx, nsamples)
+    if isinstance(xx, SimpleNamespace):
+        rr, base_img = xx, None
+    else:
+        base_img = xx.reflectance.isel(band=100)
+
+        if isinstance(nsamples, SimpleNamespace):
+            rr = nsamples
+        else:
+            rr = sample_error(xx, nsamples)
 
     fig, axd = plt.subplot_mosaic(
         [
@@ -76,8 +86,13 @@ def mk_error_plot(
     rr.axd = axd
 
     info = []
-    if epsg := xx.odc.crs.epsg:
-        info.append(f"epsg:{epsg}")
+    if base_img is not None:
+        md = base_img.odc
+        assert isinstance(md, ODCExtensionDa)
+        assert md.crs is not None
+
+        if epsg := md.crs.epsg:
+            info.append(f"epsg:{epsg}")
 
     info.append(f"avg:{rr.pix_error.mean():.3f}px")
     if msg:
@@ -86,7 +101,7 @@ def mk_error_plot(
 
     fig.suptitle(f"Pixel Registration Error, {info}")
 
-    sns.scatterplot(x=rr.ee.T[0], y=rr.ee.T[1], size=rr.pix_error, ax=axd["A"])
+    sns.scatterplot(x=rr.ee.T[0], y=rr.ee.T[1], hue=rr.pix_error, ax=axd["A"])
     if max_err_axis > 0:
         b = max_err_axis
     else:
@@ -97,22 +112,22 @@ def mk_error_plot(
     axd["A"].axhline(0, color="k", linewidth=0.3)
 
     X, Y = gxy(rr.pts_p).T
-    sns.heatmap(
-        xx.reflectance.isel(band=100),
-        cmap="bone",
-        alpha=0.7,
-        square=True,
-        cbar=False,
-        xticklabels=False,
-        yticklabels=False,
-        ax=axd["B"],
-    )
+    if base_img is not None:
+        sns.heatmap(
+            base_img,
+            cmap="bone",
+            alpha=0.7,
+            square=True,
+            cbar=False,
+            xticklabels=False,
+            yticklabels=False,
+            ax=axd["B"],
+        )
     with plt.rc_context({"legend.loc": "lower right"}):
         sns.scatterplot(
             x=X,
             y=Y,
-            size=rr.pix_error,
-            color="c",
+            hue=rr.pix_error,
             alpha=0.5,
             ax=axd["B"],
         )

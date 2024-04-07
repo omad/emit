@@ -1,6 +1,5 @@
 from ._check import dump_py_env
 from ._creds import earthdata_token, fetch_s3_creds, prep_s3_fs
-from ._gcps import SampleLoader, gcp_geobox, gen_sample, geobox_from_zarr
 from ._load import emit_load, gbox_from_pix_lonlat, gbox_from_points, ortho_gbox
 from ._md import (
     ZarrSpecMode,
@@ -18,12 +17,8 @@ from ._zict import open_zict, open_zict_json
 
 __all__ = [
     "ZarrSpecMode",
-    "SampleLoader",
     "EmitMD",
     "EmitDriver",
-    "gen_sample",
-    "gcp_geobox",
-    "geobox_from_zarr",
     "earthdata_token",
     "fetch_s3_creds",
     "prep_s3_fs",

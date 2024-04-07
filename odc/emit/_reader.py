@@ -28,9 +28,9 @@ from odc.loader._rio import capture_rio_env, rio_env
 from zarr.core import Array as ZarrArray
 
 from ._creds import prep_s3_fs
-from ._gcps import geobox_from_zarr
 from ._md import _unjson_chunk, subchunk_consolidated
 from .assets import EMIT_WAVELENGTH_VALUES
+from .gcps import geobox_from_zarr
 
 LOG = getLogger(__name__)
 
