@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from contextlib import contextmanager
 from copy import deepcopy
 from logging import getLogger
@@ -12,7 +13,7 @@ import zarr.convenience
 from odc.geo.gcp import GCPGeoBox
 from odc.geo.geobox import GeoBox
 from odc.geo.overlap import compute_reproject_roi
-from odc.geo.roi import roi_is_empty, roi_shape
+from odc.geo.roi import roi_is_empty, roi_normalise, roi_shape
 from odc.geo.warp import rio_reproject
 from odc.loader import (
     BandKey,
@@ -202,15 +203,14 @@ class EmitReader:
         selection: Optional[ReaderSubsetSelection] = None,
     ) -> tuple[tuple[slice, slice], np.ndarray]:
         # pylint: disable=too-many-locals
-        assert selection is None, "EmitReader does not support subsetting"
-
         band = self._subdataset
         LOG.info("EmitReader.read: %s@%s", band, self.href)
+
+        assert selection is None or isinstance(selection, (tuple, slice))
 
         src = self.zarr()
         src_nodata = resolve_src_nodata(getattr(src, "fill_value", None), cfg)
 
-        postfix_dims = src.shape[2:]
         src_gbox = self._gbox
 
         assert cfg.dtype is not None
@@ -219,10 +219,27 @@ class EmitReader:
         dst_nodata = resolve_dst_nodata(dst_dtype, cfg, src_nodata)
         fill_value = dst_nodata if dst_nodata is not None else 0
 
+        postfix_dims = src.shape[2:]
+        band_selection: tuple[slice, ...] = ()
+
+        if src.ndim == 3:
+            if selection is None:
+                band_selection = (slice(0, src.shape[2]),)
+            else:
+                if isinstance(selection, tuple):
+                    band_selection = selection
+                else:
+                    assert isinstance(selection, slice)
+                    band_selection = (selection,)
+
+                postfix_dims = roi_shape(roi_normalise(selection, src.shape[2:]))
+        else:
+            assert selection is None
+
         # align=32 is to align to block boundaries (rows_per_chunk)
         rr = compute_reproject_roi(src_gbox, dst_geobox, padding=16, align=32)
         # only slice along y-axis
-        roi_src = (rr.roi_src[0], slice(0, src.shape[1]))
+        roi_src: tuple[slice, slice] = (rr.roi_src[0], slice(0, src.shape[1]))  # type: ignore
         roi_dst = cast(tuple[slice, slice], rr.roi_dst)
         src_gbox = src_gbox[roi_src]
 
@@ -249,11 +266,29 @@ class EmitReader:
 
         # Perform read with data transpose for 3D cases
         # (y, x, band) -> (band, y, x) as fas as memory layout is concerned
-        LOG.debug("native-read.start: %s orig.shape=%s, rows=%d:%d", band, src.shape, roi_src[0].start, roi_src[0].stop)
-        _shape = (*roi_shape(roi_src), *postfix_dims)
+        # assert isinstance(selection, tuple)
+
+        _id = threading.current_thread().ident
+        read_roi = roi_src + band_selection
+        LOG.debug(
+            "native-read.start-%d: %s orig.shape=%s, rows=%d:%d",
+            _id,
+            band,
+            src.shape,
+            roi_src[0].start,
+            roi_src[0].stop,
+        )
+        _shape = roi_shape(read_roi)
         _src = _np_alloc_yxb(_shape, dtype=src.dtype)
-        src.get_basic_selection(roi_src, out=_src)
-        LOG.debug("native-read.stop: %s orig.shape=%s, rows=%d:%d", band, src.shape, roi_src[0].start, roi_src[0].stop)
+        src.get_basic_selection(read_roi, out=_src)
+        LOG.debug(
+            "native-read.stop-%d: %s orig.shape=%s, rows=%d:%d",
+            _id,
+            band,
+            src.shape,
+            roi_src[0].start,
+            roi_src[0].stop,
+        )
         del src
 
         assert isinstance(_src, np.ndarray)
@@ -329,9 +364,9 @@ class EmitDriver:
         return EmitMD()
 
 
-def _np_alloc_yxb(shape, **kw):
+def _np_alloc_yxb(shape, **kw) -> np.ndarray:
     """
-    For 3D shapes, assume ``shape=(ny,nx,nb)`` annd allocate array of the given shape,
+    For 3D shapes, assume ``shape=(ny,nx,nb)`` and allocate array of the given shape,
     but with native pixel order being ``b,y,x`` in memory.
 
     For all other shapes, just allocate array as usual.
