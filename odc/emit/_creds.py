@@ -42,7 +42,12 @@ def _cached_s3_creds(tk=None):
         "https://data.lpdaac.earthdatacloud.nasa.gov/s3credentials",
         headers={"Authorization": f"Bearer {tk}"},
         timeout=20,
-    ).json()
+    )
+    if not creds:
+        raise RuntimeError(f"Failed to fetch S3 credentials: {creds.reason}")
+
+    creds = creds.json()
+
     creds["expiration"] = datetime.strptime(creds["expiration"], "%Y-%m-%d %H:%M:%S%z")
     return creds
 
