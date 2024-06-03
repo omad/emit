@@ -26,7 +26,7 @@ from odc.loader import (
     resolve_src_nodata,
 )
 from odc.loader._rio import capture_rio_env, rio_env
-from odc.loader.types import ReaderSubsetSelection
+from odc.loader.types import DaskRasterReader, ReaderSubsetSelection
 from zarr.core import Array as ZarrArray
 
 from ._creds import prep_s3_fs
@@ -362,6 +362,10 @@ class EmitDriver:
     @property
     def md_parser(self) -> EmitMD:
         return EmitMD()
+
+    @property
+    def dask_reader(self) -> DaskRasterReader | None:
+        return None
 
 
 def _np_alloc_yxb(shape, **kw) -> np.ndarray:
