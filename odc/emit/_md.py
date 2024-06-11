@@ -189,7 +189,7 @@ def to_zarr_spec(
     return spec, gbox
 
 
-def _asset_name_from_url(u):
+def _asset_name_from_url(u: str) -> str:
     return u.rsplit("/", 1)[-1].split("_")[2]
 
 
@@ -236,10 +236,12 @@ def cmr_to_stac(
         cmr = json.loads(cmr)
 
     assert isinstance(cmr, dict)
-    uu = [x["URL"] for x in cmr["RelatedUrls"] if x["Type"] in {"GET DATA VIA DIRECT ACCESS"}]
+    related_urls = [x for x in cmr.get("RelatedUrls", []) if "URL" in x and "Type" in x]
 
-    visual_url, *_ = [
-        x["URL"] for x in cmr["RelatedUrls"] if x["URL"].startswith("https:") and x["URL"].endswith(".png")
+    uu = [x["URL"] for x in related_urls if x["Type"] in {"GET DATA VIA DIRECT ACCESS"}]
+
+    visual_url, *_ = [x["URL"] for x in related_urls if x["URL"].startswith("https:") and x["URL"].endswith(".png")] + [
+        ""
     ]
 
     assets = {
@@ -251,16 +253,17 @@ def cmr_to_stac(
         }
         for u in uu
     }
-    assets.update(
-        {
-            "visual": {
-                "href": visual_url,
-                "title": "Visual Preview",
-                "type": "image/png",
-                "roles": ["overview"],
+    if visual_url:
+        assets.update(
+            {
+                "visual": {
+                    "href": visual_url,
+                    "title": "Visual Preview",
+                    "type": "image/png",
+                    "roles": ["overview"],
+                }
             }
-        }
-    )
+        )
 
     dt_range = cmr["TemporalExtent"]["RangeDateTime"]
     footprint = _footprint(cmr, pts_idx)
@@ -281,7 +284,7 @@ def cmr_to_stac(
     }
 
     proj_props: dict[str, Any] = {}
-    if dmrpp_doc is not None:
+    if dmrpp_doc is not None and "RFL" in assets:
         if gcp_crs is None:
             spec, gbox = to_zarr_spec(dmrpp_doc, footprint=footprint)
         else:

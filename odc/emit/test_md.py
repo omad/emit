@@ -26,6 +26,13 @@ def cmr_sample(data_dir):
 
 
 @pytest.fixture
+def cmr_sample_partial(cmr_sample):
+    doc = cmr_sample.copy()
+    doc.pop("RelatedUrls", "")
+    yield doc
+
+
+@pytest.fixture
 def dmrpp_sample(data_dir):
     path = data_dir / "emit_l2a_rfl_sample.dmrpp"
     with open(path, "rt", encoding="utf8") as f:
@@ -57,6 +64,16 @@ def test_cmr(cmr_sample, dmrpp_sample):
     assert isinstance(xx, xr.Dataset)
     assert "ortho_x" in xx.dims
     assert "ortho_y" in xx.coords
+
+
+def test_cmr_partial(cmr_sample_partial, dmrpp_sample):
+    for dmrpp in (None, dmrpp_sample):
+        doc = cmr_to_stac(cmr_sample_partial, dmrpp)
+        assert "id" in doc
+        item = Item.from_dict(doc)
+
+        assert len(item.assets) == 0
+        assert item.datetime is not None
 
 
 def test_dmrpp(dmrpp_sample):
