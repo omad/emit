@@ -219,7 +219,7 @@ def _json_safe_chunk(v):
     return v
 
 
-def _unjson_chunk(v):
+def unjson_chunk(v):
     if isinstance(v, str):
         return b64decode(v.encode("ascii"))
     return v
@@ -359,7 +359,7 @@ def subchunk_consolidated(
     *,
     factor: int | None = None,
     rows_per_chunk: int | None = None,
-):
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """
     Subchunk consolidated metadata.
 

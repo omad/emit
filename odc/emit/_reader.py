@@ -30,7 +30,7 @@ from odc.loader.types import DaskRasterReader, ReaderSubsetSelection
 from zarr.core import Array as ZarrArray
 
 from ._creds import prep_s3_fs
-from ._md import _unjson_chunk, subchunk_consolidated
+from ._md import subchunk_consolidated, unjson_chunk
 from .assets import EMIT_WAVELENGTH_VALUES
 from .gcps import geobox_from_zarr
 
@@ -416,11 +416,11 @@ def fs_from_stac_doc(doc, fs, *, factor=None, rows_per_chunk=None, asset="RFL", 
     else:
         src = doc
 
-    chunks = {k: _unjson_chunk(v) for k, v in src["zarr:chunks"].items()}
+    chunks = {k: unjson_chunk(v) for k, v in src["zarr:chunks"].items()}
     zmd = deepcopy(src["zarr:metadata"])
 
     if factor is not None or rows_per_chunk is not None:
-        band_dims = {
+        band_dims: dict[str, tuple[str, ...]] = {
             k.rsplit("/", 1)[0]: tuple(v["_ARRAY_DIMENSIONS"])
             for k, v in zmd.items()
             if k.endswith("/.zattrs") and "_ARRAY_DIMENSIONS" in v

@@ -24,6 +24,10 @@ def geobox_from_zarr(zz, gbox_sample_pts: np.ndarray | int | None = None, n_edge
 
     lon, lat = zz["lon"], zz["lat"]
 
+    # deal with xarray inputs
+    lon = getattr(lon, "data", lon)
+    lat = getattr(lat, "data", lat)
+
     iy, ix = sample_to_idx(gbox_sample_pts, lon.shape)
     pix = np.stack([ix, iy]).T
     wld = np.stack([lon[iy, ix], lat[iy, ix]]).T
