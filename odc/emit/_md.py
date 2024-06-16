@@ -10,6 +10,7 @@ from odc.geo.xr import xr_coords
 from toolz import get_in
 
 from ._creds import prep_s3_fs
+from .assets import EMIT_WAVELENGTH_BYTES
 from .vendor.eosdis_store.dmrpp import to_zarr
 
 __all__ = ["cmr_to_stac"]
@@ -46,6 +47,10 @@ class Cfg:
     gsd = 60
     default_pt_idx = (2, 3, 0, 1)
 
+    fixed_chunks: dict[str, bytes] = {
+        "wavelength/0": EMIT_WAVELENGTH_BYTES,
+    }
+
 
 def emit_id(url: str, postfix: str = "") -> str:
     *_, _dir, _ = url.split("/")
@@ -78,11 +83,13 @@ def is_chunk_key(k: str) -> bool:
 
 
 def _do_edits(refs):
-    dims = {"downtrack": "y", "crosstrack": "x", "bands": "band"}
+    dims = {"downtrack": "y", "crosstrack": "x", "bands": "wavelength"}
+    var_renames = {"wavelengths": "wavelength", "good_wavelengths": "good_wavelength"}
+
     coords = {
         ("y", "x"): "lon lat",
-        ("band",): "wavelengths",
-        ("y", "x", "band"): "lon lat wavelengths",
+        ("wavelength",): "wavelength",
+        ("y", "x", "wavelength"): "lon lat wavelength",
     }
     drop_vars = set(["build_dmrpp_metadata"])
     drop_ds_attrs = set(["history"])
@@ -121,6 +128,8 @@ def _do_edits(refs):
         if group in flatten_groups:
             k = k[len(group) + 1 :]
 
+        group, *rest = k.split("/", 1)
+        k = "/".join([var_renames.get(group, group), *rest])
         return (k, doc)
 
     return dict(edit_one(k, doc) for k, doc in refs.items() if _keep(k))
@@ -159,14 +168,19 @@ def to_zarr_spec(
     mode: ZarrSpecMode = "default",
     footprint: geom.Geometry | None = None,
 ) -> tuple[dict[str, Any], GCPGeoBox | None]:
-    def to_docs(zz: dict[str, Any]) -> Iterator[tuple[str, str | tuple[str | None, int, int]]]:
+    def to_docs(zz: dict[str, Any]) -> Iterator[tuple[str, str | bytes | tuple[str | None, int, int]]]:
         # sorted keys are needed to work around problem in fsspec directory listing 1430
         for k in sorted(zz, key=lambda p: (p.count("/"), p)):
             doc = zz[k]
             if k.endswith("/.zchunkstore"):
                 prefix, _ = k.rsplit("/", 1)
                 for chunk_key, info in doc.items():
-                    yield f"{prefix}/{chunk_key}", (url, info["offset"], info["size"])
+                    ck = f"{prefix}/{chunk_key}"
+                    fixed = Cfg.fixed_chunks.get(ck, None)
+                    if fixed is not None:
+                        yield ck, fixed
+                    else:
+                        yield ck, (url, info["offset"], info["size"])
             else:
                 yield k, json.dumps(doc, separators=(",", ":"))
 
@@ -315,7 +329,7 @@ def cmr_to_stac(
             "_ARRAY_DIMENSIONS": [],
             **spatial_ref.attrs,
         }
-        md[".zattrs"]["coordinates"] = " ".join(["spatial_ref", "wavelengths", "lon", "lat"])
+        md[".zattrs"]["coordinates"] = " ".join(["spatial_ref", "wavelength", "lon", "lat"])
 
         chunks = {k: _json_safe_chunk(v) for k, v in spec.items() if is_chunk_key(k)}
         chunks["spatial_ref/0"] = _json_safe_chunk(spatial_ref.data.astype("<i4").tobytes())

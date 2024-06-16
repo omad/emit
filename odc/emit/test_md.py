@@ -122,12 +122,12 @@ def test_to_zarr_spec(dmrpp_sample, mode, url):
         assert "lon/.zarray" in spec
         assert "history" not in _json(".zattrs")
         assert "geotransform" not in _json(".zattrs")
-        assert _json("reflectance/.zattrs")["coordinates"] == "lon lat wavelengths"
-        assert _json("reflectance/.zattrs")["_ARRAY_DIMENSIONS"] == ["y", "x", "band"]
+        assert _json("reflectance/.zattrs")["coordinates"] == "lon lat wavelength"
+        assert _json("reflectance/.zattrs")["_ARRAY_DIMENSIONS"] == ["y", "x", "wavelength"]
 
-        assert set(xx.data_vars) == set(["reflectance", "good_wavelengths", "fwhm", "elev", "glt_x", "glt_y"])
-        assert set(xx.dims) == set(["y", "x", "band", "ortho_x", "ortho_y"])
-        assert set(xx.coords) == set(["lat", "lon", "wavelengths"])
+        assert set(xx.data_vars) == set(["reflectance", "good_wavelength", "fwhm", "elev", "glt_x", "glt_y"])
+        assert set(xx.dims) == set(["y", "x", "wavelength", "ortho_x", "ortho_y"])
+        assert set(xx.coords) == set(["lat", "lon", "wavelength"])
         assert xx.lon.shape == xx.lat.shape
         assert xx.lon.shape == xx.reflectance.shape[:2]
-        assert xx.reflectance.shape[-1] == xx.good_wavelengths.shape[0]
+        assert xx.reflectance.shape[-1] == xx.good_wavelength.shape[0]

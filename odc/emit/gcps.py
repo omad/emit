@@ -41,7 +41,7 @@ class SampleLoader:
 
     """
 
-    DROPS = ["reflectance", "fwhm", "good_wavelengths", "wavelengths"]
+    DROPS = ["reflectance", "fwhm", "good_wavelengths", "wavelength"]
 
     def __init__(self, pts, s3):
         self._pts = pts
