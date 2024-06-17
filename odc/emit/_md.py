@@ -1,7 +1,8 @@
 import asyncio
 import json
 from base64 import b64decode, b64encode
-from typing import Any, Iterable, Iterator, Literal
+from pathlib import Path
+from typing import Any, Callable, Iterable, Iterator, Literal
 
 import zarr.convenience as zc
 from odc.geo import MaybeCRS, geom, wh_, xy_
@@ -478,3 +479,21 @@ async def emit_doc_stream(
                 yield _id, doc
 
     await session.close()
+
+
+def patch_hrefs(doc: dict[str, Any], edit: Callable[[str], str]):
+    for a in doc["assets"].values():
+        if "href" in a:
+            a["href"] = edit(a["href"])
+    return doc
+
+
+def remap_to_local_dir(local_dir: str | Path) -> Callable[[str], str]:
+    if isinstance(local_dir, str):
+        local_dir = Path(local_dir.rstrip("/")).absolute()
+
+    def edit(href: str) -> str:
+        *_, name = href.rsplit("/", 1)
+        return str(local_dir / name)
+
+    return edit

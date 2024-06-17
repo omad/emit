@@ -110,56 +110,57 @@ class _Cache:
 _cache = _Cache()
 
 
+class LoaderState:
+    """
+    Shared state across all readers.
+    """
+
+    def __init__(self, geobox: GeoBox, is_dask: bool, s3) -> None:
+        self.geobox = geobox
+        self.is_dask = is_dask
+        self.s3 = s3
+        self.finalised = False
+        self._cache = _Cache.instance()
+
+    def __getstate__(self) -> dict[str, Any]:
+        return {"geobox": self.geobox, "is_dask": self.is_dask, "s3": self.s3, "finalised": self.finalised}
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        LOG.debug("EmitReader.LoaderState.__setstate__: %r", state)
+        self.geobox = state["geobox"]
+        self.is_dask = state["is_dask"]
+        self.s3 = state["s3"]
+        self.finalised = state["finalised"]
+        self._cache = _Cache.instance()
+
+    def finalise(self) -> Any:
+        self.finalised = True
+        return self
+
+    def prep(self, src: RasterSource) -> Tuple[dict[str, Any], str, GCPGeoBox]:
+        doc = {"href": src.uri, **src.driver_data}
+        subdataset = src.subdataset or doc["_subdataset"]
+
+        def _fetch_gbox(href: str) -> GCPGeoBox:
+            zz = self.open_zarr(doc, href=href)
+            return geobox_from_zarr(zz)
+
+        gbox = self._cache.get_geobox(doc["href"], _fetch_gbox)
+        return doc, subdataset, gbox
+
+    def open_zarr(self, doc, href: str | None = None, **kw):
+        return open_zarr(doc, s3=self.s3, href=href, **kw)
+
+    def __dask_tokenize__(self):
+        return ("odc.emit.EmitReader.LoaderState", self.is_dask, self.s3)
+
+
 class EmitReader:
     """
     EMIT reader.
     """
 
-    class LoaderState:
-        """
-        Shared state across all readers.
-        """
-
-        def __init__(self, geobox: GeoBox, is_dask: bool, s3) -> None:
-            self.geobox = geobox
-            self.is_dask = is_dask
-            self.s3 = s3
-            self.finalised = False
-            self._cache = _Cache.instance()
-
-        def __getstate__(self) -> dict[str, Any]:
-            return {"geobox": self.geobox, "is_dask": self.is_dask, "s3": self.s3, "finalised": self.finalised}
-
-        def __setstate__(self, state: dict[str, Any]) -> None:
-            LOG.debug("EmitReader.LoaderState.__setstate__: %r", state)
-            self.geobox = state["geobox"]
-            self.is_dask = state["is_dask"]
-            self.s3 = state["s3"]
-            self.finalised = state["finalised"]
-            self._cache = _Cache.instance()
-
-        def finalise(self) -> Any:
-            self.finalised = True
-            return self
-
-        def prep(self, src: RasterSource) -> Tuple[dict[str, Any], str, GCPGeoBox]:
-            doc = {"href": src.uri, **src.driver_data}
-            subdataset = src.subdataset or doc["_subdataset"]
-
-            def _fetch_gbox(href: str) -> GCPGeoBox:
-                zz = self.open_zarr(doc, href=href)
-                return geobox_from_zarr(zz)
-
-            gbox = self._cache.get_geobox(doc["href"], _fetch_gbox)
-            return doc, subdataset, gbox
-
-        def open_zarr(self, doc, href: str | None = None, **kw):
-            return open_zarr(doc, s3=self.s3, href=href, **kw)
-
-        def __dask_tokenize__(self):
-            return ("odc.emit.EmitReader.LoaderState", self.is_dask, self.s3)
-
-    def __init__(self, doc: dict[str, Any], subdataset: str, gbox: GCPGeoBox, ctx: "EmitReader.LoaderState") -> None:
+    def __init__(self, doc: dict[str, Any], subdataset: str, gbox: GCPGeoBox, ctx: LoaderState) -> None:
         self._doc = doc
         self._subdataset = subdataset
         self._gbox = gbox
@@ -180,7 +181,7 @@ class EmitReader:
         return ("odc.emit.EmitReader", self._doc, self._subdataset, *self._ctx.__dask_tokenize__()[1:])
 
     @staticmethod
-    def open(src: RasterSource, ctx: "EmitReader.LoaderState") -> "EmitReader":
+    def open(src: RasterSource, ctx: LoaderState) -> "EmitReader":
         LOG.info("EmitReader.open: %s", src.uri)
         doc, subdataset, gbox = ctx.prep(src)
         return EmitReader(doc, subdataset, gbox, ctx)
@@ -293,7 +294,13 @@ class EmitReader:
 
         assert isinstance(_src, np.ndarray)
         LOG.debug(
-            "starting reproject: %s %s, nodata=%f=>%f, fill=%f", band, _src.shape, src_nodata, dst_nodata, fill_value
+            "reproject.start-%d: %s %s, nodata=%f=>%f, fill=%f",
+            _id,
+            band,
+            _src.shape,
+            src_nodata,
+            dst_nodata,
+            fill_value,
         )
 
         _dst = rio_reproject(
@@ -306,7 +313,7 @@ class EmitReader:
             src_nodata=src_nodata,
             ydim=0,
         )
-        LOG.debug("done with reproject: %s %s", band, _src.shape)
+        LOG.debug("reproject.stop-%d: %s %s", _id, band, _src.shape)
 
         return roi_dst, _dst
 
@@ -328,12 +335,12 @@ class EmitDriver:
         geobox: GeoBox,
         *,
         chunks: None | Dict[str, int] = None,
-    ) -> EmitReader.LoaderState:
+    ) -> LoaderState:
         LOG.debug("EmitDriver.new_load: chunks=%r", chunks)
         s3 = self._s3
         if s3 is None:
             s3 = prep_s3_fs(creds=self._creds)
-        return EmitReader.LoaderState(geobox, chunks is not None, s3=s3)
+        return LoaderState(geobox, chunks is not None, s3=s3)
 
     def finalise_load(self, load_state: EmitReader.LoaderState) -> Any:
         LOG.debug("EmitDriver.finalise_load")
@@ -344,7 +351,7 @@ class EmitDriver:
         return capture_rio_env()
 
     @contextmanager
-    def restore_env(self, env: Dict[str, Any], load_state: EmitReader.LoaderState) -> Iterator[EmitReader.LoaderState]:
+    def restore_env(self, env: Dict[str, Any], load_state: LoaderState) -> Iterator[LoaderState]:
         assert isinstance(env, dict)
         LOG.debug("EmitDriver.restore_env")
         # rasterio reproject inits GDAL, that can be costly across many threads
@@ -355,7 +362,7 @@ class EmitDriver:
     def open(
         self,
         src: RasterSource,
-        ctx: EmitReader.LoaderState,
+        ctx: LoaderState,
     ) -> EmitReader:
         return EmitReader.open(src, ctx)
 
