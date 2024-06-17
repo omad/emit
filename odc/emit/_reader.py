@@ -10,6 +10,8 @@ from typing import Any, Callable, Dict, Iterator, Optional, Tuple, cast
 import fsspec
 import numpy as np
 import zarr.convenience
+from dask.base import tokenize
+from dask.delayed import Delayed, delayed
 from odc.geo.gcp import GCPGeoBox
 from odc.geo.geobox import GeoBox
 from odc.geo.overlap import compute_reproject_roi
@@ -318,6 +320,69 @@ class EmitReader:
         return roi_dst, _dst
 
 
+def _dask_read_adaptor(
+    rdr: EmitReader,
+    cfg: RasterLoadParams,
+    dst_geobox: GeoBox,
+    selection: Optional[ReaderSubsetSelection] = None,
+) -> tuple[tuple[slice, slice], np.ndarray]:
+    return rdr.read(cfg, dst_geobox, selection=selection)
+
+
+class EmitReaderDask:
+    """
+    Creates default ``DaskRasterReader`` from a ``ReaderDriver``.
+
+    Suitable for implementing ``.dask_reader`` property for generic reader drivers.
+    """
+
+    def __init__(
+        self,
+        src: RasterSource | None = None,
+        ctx: LoaderState | None = None,
+        layer_name: str = "",
+    ) -> None:
+        rdr: Delayed | None = None
+
+        if src is not None:
+            assert ctx is not None
+            tk = tokenize(src)
+            rdr = delayed(EmitReader.open)(src, ctx, dask_key_name=(f"emit-open-{tk}",))
+
+        self._ctx = ctx
+        self._src = src
+        self._layer_name = layer_name
+        self._rdr = rdr
+
+    def read(
+        self,
+        cfg: RasterLoadParams,
+        dst_geobox: GeoBox,
+        *,
+        selection: Optional[ReaderSubsetSelection] = None,
+        idx: tuple[int, ...],
+    ) -> Any:
+        assert self._rdr is not None
+        read_op = delayed(_dask_read_adaptor, name=self._layer_name)
+        rdr = self._rdr
+        assert rdr is not None
+
+        return read_op(
+            rdr,
+            cfg,
+            dst_geobox,
+            selection=selection,
+            dask_key_name=(self._layer_name, *idx),
+        )
+
+    def open(self, src: RasterSource, ctx: LoaderState, layer_name: str) -> "EmitReaderDask":
+        return EmitReaderDask(
+            src,
+            ctx,
+            layer_name=layer_name,
+        )
+
+
 class EmitDriver:
     """
     Reader for EMIT data.
@@ -326,6 +391,7 @@ class EmitDriver:
     def __init__(self, *, s3=None, creds=None) -> None:
         self._creds = creds
         self._s3 = s3
+        self._dask_reader = EmitReaderDask()
 
     def __dask_tokenize__(self):
         return ("odc.emit.EmitDriver", self._s3, self._creds)
@@ -372,7 +438,7 @@ class EmitDriver:
 
     @property
     def dask_reader(self) -> DaskRasterReader | None:
-        return None
+        return self._dask_reader
 
 
 def _np_alloc_yxb(shape, **kw) -> np.ndarray:
