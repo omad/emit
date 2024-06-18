@@ -10,7 +10,6 @@ from typing import Any, Callable, Dict, Iterator, Optional, Tuple, cast
 import fsspec
 import numpy as np
 import zarr.convenience
-from dask.base import tokenize
 from dask.delayed import Delayed, delayed
 from odc.geo.gcp import GCPGeoBox
 from odc.geo.geobox import GeoBox
@@ -341,17 +340,18 @@ class EmitReaderDask:
         src: RasterSource | None = None,
         ctx: LoaderState | None = None,
         layer_name: str = "",
+        idx: int = 0,
     ) -> None:
         rdr: Delayed | None = None
 
         if src is not None:
             assert ctx is not None
-            tk = tokenize(src)
-            rdr = delayed(EmitReader.open)(src, ctx, dask_key_name=(f"emit-open-{tk}",))
+            rdr = delayed(EmitReader.open)(src, ctx, dask_key_name=(layer_name, idx))
 
         self._ctx = ctx
         self._src = src
         self._layer_name = layer_name
+        self._src_idx = idx
         self._rdr = rdr
 
     def read(
@@ -375,11 +375,12 @@ class EmitReaderDask:
             dask_key_name=(self._layer_name, *idx),
         )
 
-    def open(self, src: RasterSource, ctx: LoaderState, layer_name: str) -> "EmitReaderDask":
+    def open(self, src: RasterSource, ctx: LoaderState, layer_name: str, idx: int) -> "EmitReaderDask":
         return EmitReaderDask(
             src,
             ctx,
             layer_name=layer_name,
+            idx=idx,
         )
 
 

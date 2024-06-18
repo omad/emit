@@ -94,8 +94,9 @@ def test_reader_driver_dask(cmr_sample, dmrpp_sample, data_dir):
     )
 
     layer_name = f"reflectance-{tk}"
-    idx = (0, 0, 0, 0, 0)
-    rdr = driver.dask_reader.open(src, ctx, layer_name=layer_name)
+    src_idx = 0
+    idx = (0, 0, 0, 0, src_idx)
+    rdr = driver.dask_reader.open(src, ctx, layer_name=layer_name, idx=src_idx)
     assert isinstance(rdr, EmitReaderDask)
     chunk_future = rdr.read(cfg, gbox, selection=np.s_[:10], idx=idx)
 
