@@ -91,7 +91,7 @@ def av3_xr_load(base, extra_coords: dict[str, Any] | None = None):
     return ds
 
 
-def mk_av3_ds(xx: xr.Dataset) -> dict[str, Any]:
+def av3_mk_dataset(xx: xr.Dataset, zarr_md: dict[str, Any] | None = None) -> dict[str, Any]:
     _id = xx.id
     gbox = xx.odc.geobox
     assert gbox is not None
@@ -103,7 +103,7 @@ def mk_av3_ds(xx: xr.Dataset) -> dict[str, Any]:
     url = f"s3://adias-prod-dc-data-projects/odc-hs/av3/{_id}.zarr"
     dt = av3_timestamp(_id).isoformat() + "Z"
 
-    return {
+    doc = {
         "$schema": "https://schemas.opendatacube.org/dataset",
         "id": _uuid,
         "product": {"name": "av3_l2a"},
@@ -123,5 +123,10 @@ def mk_av3_ds(xx: xr.Dataset) -> dict[str, Any]:
             "dtr:end_datetime": dt,
             "eo:instrument": ["AVIRIS"],
         },
-        "measurements": {name: {"layer": name} for name in map(str, xx.data_vars)},
+        "measurements": {name: {"layer": name, "driver_data": "rfl"} for name in map(str, xx.data_vars)},
     }
+
+    if zarr_md is not None:
+        doc["driver_data"] = {"rfl": {"zarr:metadata": zarr_md["metadata"]}}
+
+    return doc
