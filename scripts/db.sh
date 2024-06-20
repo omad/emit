@@ -4,7 +4,7 @@ export PATH=$HOME/.local/mamba/bin:$PATH
 db_dir=~/Data/DB
 db_log=/tmp/db.log
 
-db_snapshot_s3="s3://adias-prod-dc-data-projects/odc-hs/datacube-db-20240620.tar.xz"
+db_snapshot_s3="s3://adias-prod-dc-data-projects/odc-hs/datacube-db-latest.tar.xz"
 
 _start() {
   exec pg_ctl -D "$db_dir" -l "$db_log" "$@" start
@@ -35,8 +35,19 @@ _fetch() {
     echo "Database already exists at $db_dir"
     return 1
   fi
+  printf "Fetching database\n %s\n %s\n" "$db_url" "$db_dir"
   mkdir -p "$db_dir"
   aws s3 cp "$db_url" - | tar -xJ -C "$db_dir"
+}
+
+_snapshot(){
+  local out="/tmp/datacube-db-$(date +%Y%m%d).tar.xz"
+  printf "Saving to %s\n" "$out"
+  (cd $db_dir && tar -c . | xz -zv -4 -T 0) > "$out"
+  printf "Database snapshot created at %s\n" "$out"
+  printf "To upload to S3, run:\n"
+  printf "> aws s3 cp %s %s/\n" "$out" $(dirname "$db_snapshot_s3")
+  printf "> aws s3 cp %s %s\n" "$out" "$db_snapshot_s3"
 }
 
 main() {
@@ -61,7 +72,11 @@ main() {
     shift
     _fetch "$@"
     ;;
-  *) echo "Invalid parameter. Please use on of 'start,stop,log,env,fetch'." ;;
+  "snapshot")
+    shift
+    _snapshot "$@"
+    ;;
+  *) echo "Invalid parameter. Please use on of 'start,stop,log,env,fetch,snapshot'." ;;
   esac
 }
 
