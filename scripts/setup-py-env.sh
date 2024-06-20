@@ -27,11 +27,11 @@ EE="${HOME}/.envs/emit"
 
 # Add extras
 DEPS=(
-    "odc-stac==0.3.10a1"
-    "odc-geo>=0.4.2"
-    "s3fs"
-    "git+https://github.com/csiro-easi/emit"
-    "git+https://github.com/opendatacube/datacube-core@f6ff8e24e2204ebc26b9040209cc565c9212dbc8"
+  "s3fs"
+  "git+https://github.com/opendatacube/datacube-core@hs-load"
+  "git+https://github.com/opendatacube/odc-geo.git@hs-load"
+  "git+https://github.com/opendatacube/odc-stac.git@hs-load"
+  "git+https://github.com/csiro-easi/emit.git@new-reader-api"
 )
 "$EE/bin/python" -m pip install "${DEPS[@]}"
 "$EE/bin/python" -m odc.emit info 
