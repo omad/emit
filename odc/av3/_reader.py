@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import Any, Tuple
 
@@ -11,6 +12,9 @@ from odc.geo.converters import rio_geobox
 from odc.geo.gcp import GCPGeoBox
 from odc.geo.geobox import GeoBox
 from odc.geo.xr import wrap_xr
+
+# uuid.uuid5(uuid.NAMESPACE_URL, "https://stacspec.org")
+UUID_NAMESPACE_STAC = uuid.UUID("55d26088-a6d0-5c77-bf9a-3a7f3c6a6dab")
 
 
 def _envi_np_mmap(path: str) -> Tuple[Any, float, GeoBox | GCPGeoBox | None]:
@@ -85,3 +89,39 @@ def av3_xr_load(base, extra_coords: dict[str, Any] | None = None):
         attrs={"id": av3_basename(base)},
     )
     return ds
+
+
+def mk_av3_ds(xx: xr.Dataset) -> dict[str, Any]:
+    _id = xx.id
+    gbox = xx.odc.geobox
+    assert gbox is not None
+    assert gbox.crs is not None
+    assert gbox.crs.epsg is not None
+
+    _uuid = str(uuid.uuid5(UUID_NAMESPACE_STAC, _id))
+
+    url = f"s3://adias-prod-dc-data-projects/odc-hs/av3/{_id}.zarr"
+    dt = av3_timestamp(_id).isoformat() + "Z"
+
+    return {
+        "$schema": "https://schemas.opendatacube.org/dataset",
+        "id": _uuid,
+        "product": {"name": "av3_l2a"},
+        "location": url,
+        # grids
+        "crs": f"EPSG:{gbox.crs.epsg}",
+        "grids": {
+            "default": {
+                "shape": list(gbox.shape.yx),
+                "transform": list(gbox.transform)[:6],
+            }
+        },
+        # ----------
+        "properties": {
+            "av3:granule": _id,
+            "dtr:start_datetime": dt,
+            "dtr:end_datetime": dt,
+            "eo:instrument": ["AVIRIS"],
+        },
+        "measurements": {name: {"layer": name} for name in map(str, xx.data_vars)},
+    }
