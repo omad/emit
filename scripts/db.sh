@@ -4,7 +4,7 @@ export PATH=$HOME/.local/mamba/bin:$PATH
 db_dir=~/Data/DB
 db_log=/tmp/db.log
 
-db_snapshot_s3="s3://adias-prod-dc-data-projects/odc-hs/datacube-db-latest.tar.xz"
+db_snapshot_s3="s3://adias-prod-dc-data-projects/odc-hs/db/datacube-latest.tar.xz"
 
 _start() {
   exec pg_ctl -D "$db_dir" -l "$db_log" "$@" start
@@ -41,7 +41,7 @@ _fetch() {
 }
 
 _snapshot(){
-  local out="/tmp/datacube-db-$(date +%Y%m%d).tar.xz"
+  local out="/tmp/datacube-$(date +%Y%m%dT%H%M).tar.xz"
   printf "Saving to %s\n" "$out"
   (cd $db_dir && tar -c . | xz -zv -4 -T 0) > "$out"
   printf "Database snapshot created at %s\n" "$out"
