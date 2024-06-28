@@ -338,6 +338,7 @@ class EmitReaderDask:
     def __init__(
         self,
         src: RasterSource | None = None,
+        cfg: RasterLoadParams | None = None,
         ctx: LoaderState | None = None,
         layer_name: str = "",
         idx: int = 0,
@@ -350,34 +351,44 @@ class EmitReaderDask:
 
         self._ctx = ctx
         self._src = src
+        self._cfg = cfg
         self._layer_name = layer_name
         self._src_idx = idx
         self._rdr = rdr
 
     def read(
         self,
-        cfg: RasterLoadParams,
         dst_geobox: GeoBox,
         *,
         selection: Optional[ReaderSubsetSelection] = None,
         idx: tuple[int, ...],
     ) -> Any:
         assert self._rdr is not None
+        assert self._cfg is not None
+
         read_op = delayed(_dask_read_adaptor, name=self._layer_name)
         rdr = self._rdr
         assert rdr is not None
 
         return read_op(
             rdr,
-            cfg,
+            self._cfg,
             dst_geobox,
             selection=selection,
             dask_key_name=(self._layer_name, *idx),
         )
 
-    def open(self, src: RasterSource, ctx: LoaderState, layer_name: str, idx: int) -> "EmitReaderDask":
+    def open(
+        self,
+        src: RasterSource,
+        cfg: RasterLoadParams,
+        ctx: LoaderState,
+        layer_name: str,
+        idx: int,
+    ) -> "EmitReaderDask":
         return EmitReaderDask(
             src,
+            cfg,
             ctx,
             layer_name=layer_name,
             idx=idx,
