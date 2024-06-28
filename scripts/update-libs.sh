@@ -2,12 +2,12 @@
 
 DEPS=(
   "s3fs"
+  "odc-geo>=0.4.7"
+  "odc-stac>=0.3.10rc3"
   "git+https://github.com/opendatacube/datacube-core@hs-load"
-  "git+https://github.com/opendatacube/odc-geo.git@hs-load"
-  "git+https://github.com/opendatacube/odc-stac.git@hs-load"
 
-  #"odc-geo>=0.4.7rc1"
-  #"odc-stac>=0.3.10rc2"
+  #"git+https://github.com/opendatacube/odc-stac.git@hs-load"
+  #"git+https://github.com/opendatacube/odc-geo.git@hs-load"
 )
 
 DEPS_ACTIVE_DEV=(
