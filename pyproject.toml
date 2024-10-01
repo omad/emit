@@ -2,6 +2,58 @@
 requires = ["setuptools>=51.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "odc-emit"
+version = "0.1.2"
+authors = [
+  {name = "Open Data Cube"}
+]
+maintainers = [
+  {name = "Open Data Cube"}
+]
+readme = "README.rst"
+license = {file = "LICENSE"}
+
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Typing :: Typed",
+]
+
+requires-python = ">=3.10"
+dependencies = [
+    "odc-geo[xr,warp]",
+    "toolz",
+    "numpy",
+    "zarr",
+    "xarray",
+    "fsspec",
+    "dask",
+    "matplotlib",
+    "zict",
+    "affine",
+    "requests>=2.32.3",
+    "odc-stac>=0.3.10",
+    "zstandard>=0.23.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/opendatacube/odc-emit/"
+Documentation = "https://odc-emit.readthedocs.io/en/latest/"
+"Bug Tracker" = "https://github.com/opendatacube/odc-emit/issues"
+
+[project.optional-dependencies]
+test = [
+  "pytest",
+  "geopandas",
+  "dask"
+]
+
+
 [tool.mypy]
 python_version = "3.10"
 ignore_missing_imports = true

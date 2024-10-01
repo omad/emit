@@ -29,8 +29,8 @@ EE="${HOME}/.envs/emit"
 DEPS=(
   "s3fs"
   "git+https://github.com/opendatacube/datacube-core@hs-load"
-  "git+https://github.com/opendatacube/odc-geo.git@hs-load"
-  "git+https://github.com/opendatacube/odc-stac.git@hs-load"
+  "git+https://github.com/opendatacube/odc-geo.git"
+  "git+https://github.com/opendatacube/odc-stac.git"
   "git+https://github.com/csiro-easi/emit.git@new-reader-api"
 )
 "$EE/bin/python" -m pip install "${DEPS[@]}"
